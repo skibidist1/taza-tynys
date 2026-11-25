@@ -57,13 +57,14 @@ export function localStamp(ms, offsetSec) {
   return new Date(ms + offsetSec * 1000).toISOString().slice(0, 16);
 }
 
-async function chain(url, key, freshMs, valid, wrap, fallbackUrl, preferCache) {
+async function chain(url, key, freshMs, valid, wrap, fallbackUrl, preferCache, worse = () => false) {
   const cached = cacheGet(key, valid);
   if (preferCache && cached && Date.now() - (cached.savedMs || 0) < freshMs) return { data: cached, source: 'cache', fresh: true };
   let error = null;
   try {
     const data = await wrap(url);
     if (!valid(data)) throw new Error('unexpected response');
+    if (cached && worse(data, cached)) return { data: cached, source: 'cache', error: 'partial answer, kept saved data' };
     data.savedMs = Date.now();
     cacheSet(key, data);
     return { data, source: 'live' };
@@ -85,6 +86,14 @@ export async function loadForecast({ preferCache = true, point } = {}) {
   return { raw: r.data, source: r.source, error: r.error, fresh: r.fresh };
 }
 
+export const okCount = (s) => s.sensors.filter((x) => x.ok).length;
+export function okMedian(s) {
+  const v = s.sensors.filter((x) => x.ok).map((x) => x.pm25).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+
 export const SENSORS_TIMEOUT_MS = 18000; // a cold serverless start can take ~9 s
 
 // Instant first paint: cached sensors (any age) or the bundled snapshot; refresh separately.
@@ -95,7 +104,9 @@ export async function initialSensors() {
 }
 
 export async function loadSensors({ preferCache = true } = {}) {
-  const r = await chain(SENSORS_URL, SN_KEY, SN_FRESH_MS, validSensors, (u) => fetchJson(u, SENSORS_TIMEOUT_MS), 'data/sensors_snapshot.json', preferCache);
+  // a partial answer (a source failed) with fewer working sensors than the saved copy must not replace it
+  const worse = (n, c) => (n.errors || []).length > 0 && okCount(n) < okCount(c) && Date.now() - (c.savedMs || 0) < 6 * 3600 * 1000;
+  const r = await chain(SENSORS_URL, SN_KEY, SN_FRESH_MS, validSensors, (u) => fetchJson(u, SENSORS_TIMEOUT_MS), 'data/sensors_snapshot.json', preferCache, worse);
   return { sensors: r.data, source: r.data.snapshot && r.source === 'live' ? 'snapshot' : r.source, error: r.error, fresh: r.fresh };
 }
 

@@ -22,6 +22,10 @@ AIRKAZ_URL = "https://airkaz.org/almaty.php"
 SC_URL = "https://data.sensor.community/airrohr/v1/filter/area=43.25,76.92,25"
 
 
+# AirKaz answers in ~5-6 s; sensor.community is fast. Vercel's default function limit is 10 s+.
+TIMEOUTS = {"airkaz": 11, "sensor.community": 6}
+
+
 def _get(url, timeout=6):
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -54,9 +58,11 @@ def parse_airkaz(html, now):
             if x.get("pm25") in (None, ""):
                 continue
             v = float(x["pm25"])
-            if not _valid(v):
-                continue
             hour = x.get("hour")
+            if not _valid(v):
+                if hour == "now":
+                    s["bad_now"] = True  # current reading is an error code: do not fall back to an old hour as "live"
+                continue
             if hour == "now":
                 s["pm25"] = v
                 continue
@@ -77,7 +83,7 @@ def parse_airkaz(html, now):
         s["live"] = s["pm25"] is not None and now - datetime.fromisoformat(s["updated"]) <= timedelta(hours=LIVE_HOURS)
         # a sensor whose daily median is below 1 ug/m3 is most likely broken (city air is never that clean for a day)
         vals = sorted([v for _, v in hist] + ([s["pm25"]] if s["pm25"] is not None else []))
-        s["suspect"] = len(vals) >= 6 and vals[len(vals) // 2] < 1.0
+        s["suspect"] = (len(vals) >= 6 and vals[len(vals) // 2] < 1.0) or s.pop("bad_now", False)
         out.append(s)
     return out
 
@@ -121,7 +127,7 @@ def collect():
     sensors, errors = [], []
     jobs = {"airkaz": (AIRKAZ_URL, parse_airkaz), "sensor.community": (SC_URL, parse_sc)}
     with ThreadPoolExecutor(max_workers=2) as ex:  # fetch both sources in parallel
-        futs = {name: ex.submit(_get, url) for name, (url, _) in jobs.items()}
+        futs = {name: ex.submit(_get, url, TIMEOUTS[name]) for name, (url, _) in jobs.items()}
         for name, (_, parse) in jobs.items():
             try:
                 sensors += parse(futs[name].result(), now)
@@ -148,6 +154,8 @@ class handler(BaseHTTPRequestHandler):  # noqa: N801 (Vercel expects this name)
         # never let a CDN keep an empty answer: both sources down -> 502, no-store
         self.send_response(502 if failed else 200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-store" if failed else "public, s-maxage=600, stale-while-revalidate=1200")
+        # partial answer (one source failed) is cached only briefly, without stale-while-revalidate
+        cache = "no-store" if failed else ("public, s-maxage=60" if data["errors"] else "public, s-maxage=600, stale-while-revalidate=1200")
+        self.send_header("Cache-Control", cache)
         self.end_headers()
         self.wfile.write(body)

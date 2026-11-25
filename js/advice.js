@@ -104,24 +104,30 @@ export function nextBad(hours, nowIndex, limit = 35.4) {
   return bad.find((r) => r.hours.length >= 2) || bad[0] || null;
 }
 
-export function bestVentHour(hours, nowIndex) {
-  const view = forecastView(hours, nowIndex, 12).filter((h) => hourOf(h) >= WAKE_FROM && hourOf(h) <= 22);
+// Best hour to air the room: waking hours of the next 24 h, never inside the bad episode.
+export function bestVentHour(hours, nowIndex, badIdx = new Set()) {
+  const view = forecastView(hours, nowIndex, 24).filter((h) => hourOf(h) >= WAKE_FROM && hourOf(h) <= 22 && !badIdx.has(h.idx));
   return view.length ? view.reduce((a, b) => (b.fc < a.fc ? b : a)) : null;
 }
 
+// One consistent plan: the ventilation advice never points inside the "windows closed" episode.
 export function actions(hours, nowIndex, profileKey) {
   const prof = PROFILES[profileKey] || PROFILES.general;
   const now = hours[nowIndex];
   const out = [];
-  const vent = bestVentHour(hours, nowIndex);
-  if (now.fc <= 35.4 && (!vent || now.fc <= vent.fc * 1.15)) out.push({ key: 'vent_now', pm: now.fc });
+  const bad = nextBad(hours, nowIndex, prof.limit);
+  const badIdx = new Set(bad ? bad.hours.map((h) => h.idx) : []);
+  const vent = bestVentHour(hours, nowIndex, badIdx);
+  const nowOk = !badIdx.has(now.idx) && now.fc <= prof.limit;
+  if (nowOk && (!vent || now.fc <= vent.fc * 1.15)) out.push({ key: 'vent_now', pm: now.fc, bad });
+  else if (bad) out.push({ key: 'vent_plan', bad, vent });
   else if (vent && vent.idx !== now.idx) out.push({ key: 'vent_later', time: vent.time, pm: vent.fc });
   else out.push({ key: 'vent_short' });
   // the cleanest window by mean forecast over the next 48 hours
   const w = findWindows(hours, nowIndex, profileKey).filter((x) => x.ok).sort((a, b) => a.window.mean - b.window.mean)[0];
   if (w) out.push({ key: 'activity_window', from: w.window.from, to: w.window.to, pm: w.window.max });
   else out.push({ key: 'activity_none', limit: prof.limit });
-  out.push({ key: `cat_${CAT_KEYS[catOf(now.fc)]}_${profileKey}`, bad: nextBad(hours, nowIndex, prof.limit) });
+  out.push({ key: `cat_${CAT_KEYS[catOf(now.fc)]}_${profileKey}` });
   return out;
 }
 

@@ -1,5 +1,5 @@
 import { t, tl, num, getLang, setLang, weekday, dateLong, hhmm, hhPlus1 } from './i18n.js';
-import { loadForecast, loadSensors, initialSensors, buildHours, nearestSensor } from './data.js';
+import { loadForecast, loadSensors, initialSensors, buildHours, nearestSensor, okCount, okMedian } from './data.js';
 import {
   catOf, CAT_KEYS, EPA_STEPS, PROFILES, findWindows, actions, nextBad, forecastView,
   schoolDay, schoolDays, DEFAULT_BELLS, DEFAULT_PE, validTime,
@@ -43,6 +43,12 @@ const shown = (pm) => (pm < 100 ? Math.round(pm * 10) / 10 : Math.round(pm)); //
 const fmtPm = (pm) => num(shown(pm), pm < 100 ? 1 : 0);
 const catName = (pm, l) => (l ? tl(l, `cat_${CAT_KEYS[catOf(shown(pm))]}`) : t(`cat_${CAT_KEYS[catOf(shown(pm))]}`));
 const when = (time) => `${dayName(time.slice(0, 10)).toLowerCase()} ${hhmm(time)}`;
+// end of an episode = start of the hour after its last hour (the day can change at midnight)
+function endOf(run) {
+  const d = new Date(`${run.to}:00Z`);
+  d.setUTCHours(d.getUTCHours() + 1);
+  return when(d.toISOString().slice(0, 16));
+}
 
 function applyStatic() {
   document.documentElement.lang = getLang() === 'kk' ? 'kk' : 'ru';
@@ -146,7 +152,7 @@ function renderHero() {
     <div class="facts">
       <span>${esc(t('now_sensor', { name: near.sensor.name, km: num(near.km, 1) }))}</span>
       ${near.km > 5 ? `<span class="warn">${esc(t('sensor_far', { km: num(near.km, 1) }))}</span>` : ''}
-      <span>${esc(t('now_city', { m: num(sn.median, 1), n: sn.liveCount ?? 0 }))}</span>
+      <span>${esc(t('now_city', { m: num(okMedian(sn), 1), n: okCount(sn) }))}</span>
     </div>
     <div class="vs"><span>${esc(t('cams_says', { v: num(cams) }))}</span><b>${esc(cmp)}</b></div>
     ${state.mode === 'archive' ? demoEval() : ''}`;
@@ -169,7 +175,17 @@ function demoEval() {
     const a = schoolDay(actualHours, d, DEFAULT_BELLS[1], [], 35.4, d === day ? hours[nowIndex].time.slice(0, 16) : null).lessons;
     f.forEach((l, i) => { if (l.verdict && a[i].verdict) { n++; if ((l.verdict === 'no') === (a[i].verdict === 'no')) ok++; } });
   }
-  return `<p class="demo-eval">${esc(t('demo_eval', { m: num(mae((h) => h.fc)), p: num(mae(() => state.pmNow)), ok, n }))}</p>`;
+  // every statement below is computed from this episode, nothing is asserted in advance
+  const maxF = Math.max(...view.map((h) => h.fc));
+  const maxA = Math.max(...view.map((h) => act[h.time]));
+  const allIndoor = days.every((d) => schoolDay(hours.map((h) => ({ ...h, fc: act[h.time] ?? null })), d, DEFAULT_BELLS[1], [], 35.4,
+    d === day ? hours[nowIndex].time.slice(0, 16) : null).lessons.every((l) => !l.verdict || l.verdict === 'no'));
+  const parts = [
+    t(maxF < 0.85 * maxA ? 'de_peak_under' : 'de_peak_ok', { f: num(maxF), a: num(maxA) }),
+    t('de_mae', { m: num(mae((h) => h.fc)), p: num(mae(() => state.pmNow)) }),
+    t('de_dec', { ok, n }) + (allIndoor && n ? ` ${t('de_all_indoor')}` : ''),
+  ];
+  return `<p class="demo-eval">${esc(`${t('de_title')} ${parts.join(' ')}`)}</p>`;
 }
 
 function renderProfiles() {
@@ -186,13 +202,19 @@ function renderActions() {
   const { hours, nowIndex } = state.data;
   if (state.pmNow == null) { $('#actions').innerHTML = `<p class="small">${esc(t('no_data_hint'))}</p>`; return; }
   const items = actions(hours, nowIndex, state.profile).map((a) => {
-    if (a.key === 'vent_now') return esc(t('vent_now', { pm: num(a.pm) }));
+    if (a.key === 'vent_now') {
+      const later = a.bad ? `<span class="sub2">${esc(t('closed_later', { from: when(a.bad.from), to: endOf(a.bad), max: num(a.bad.max) }))}</span>` : '';
+      return `${esc(t('vent_now', { pm: num(a.pm) }))}${later}`;
+    }
+    if (a.key === 'vent_plan') {
+      return esc(t('vent_plan', { from: when(a.bad.from), to: endOf(a.bad), max: num(a.bad.max) }))
+        + (a.vent ? ` ${esc(t('vent_plan_air', { t: when(a.vent.time), pm: num(a.vent.fc) }))}` : '');
+    }
     if (a.key === 'vent_later') return esc(t('vent_later', { t: hhmm(a.time), pm: num(a.pm) }));
     if (a.key === 'vent_short') return esc(t('vent_short'));
     if (a.key === 'activity_window') return esc(t('activity_window', { from: `${dayName(a.from.slice(0, 10)).toLowerCase()} ${hhmm(a.from)}`, to: hhPlus1(a.to), pm: num(a.pm) }));
     if (a.key === 'activity_none') return esc(t('activity_none', { limit: num(a.limit, 1) }));
-    const bad = a.bad ? `<span class="sub2">${esc(t('bad_span', { from: when(a.bad.from), to: `${dayName(a.bad.to.slice(0, 10)).toLowerCase()} ${hhPlus1(a.bad.to)}`, max: num(a.bad.max) }))}</span>` : '';
-    return `${esc(t(a.key))}${bad}`;
+    return esc(t(a.key));
   });
   $('#actions').innerHTML = `<h2>${esc(t('actions_title'))}</h2>
     <ol class="acts">${items.map((s) => `<li><span>${s}</span></li>`).join('')}</ol>
@@ -228,7 +250,7 @@ function renderStrip() {
   $('#mark-actual').hidden = !act;
   const h = state.data.hours[state.sel];
   $('#hour-detail').textContent = t('hour_detail', {
-    t: `${dayName(h.time.slice(0, 10))} ${hhmm(h.time)}`, fc: num(h.fc), cams: num(h.cams), inv: num(h.inv, 1), wind: num(h.wind, 1), blh: num(h.blh),
+    t: `${dayName(h.time.slice(0, 10))} ${hhmm(h.time)}`, fc: fmtPm(h.fc), cams: num(h.cams), inv: num(h.inv, 1), wind: num(h.wind, 1), blh: num(h.blh),
   });
 }
 
@@ -291,8 +313,8 @@ function renderWhy() {
     <article class="card gauge">
       <p class="hint">${esc(t('why_for', { t: `${dayName(h.time.slice(0, 10))} ${hhmm(h.time)}` }))}</p>
       <h2>${esc(t('why_title'))}</h2>
-      <div class="pct" style="color:${catVar(h.fc)}">${num(h.fc)} <span class="unit">${esc(t('pm_unit'))}</span></div>
-      <p class="story">${esc(t('why_fc', { fc: num(h.fc), cat: catName(h.fc), cams: num(h.cams) }))}</p>
+      <div class="pct" style="color:${catVar(h.fc)}">${fmtPm(h.fc)} <span class="unit">${esc(t('pm_unit'))}</span></div>
+      <p class="story">${esc(t('why_fc', { fc: fmtPm(h.fc), cat: catName(h.fc), cams: num(h.cams) }))}</p>
       ${phys.map((p) => `<p>${esc(p)}</p>`).join('')}
     </article>
     <article class="card">
@@ -331,7 +353,7 @@ function announcement(sd, lang) {
   for (const l of pe) {
     lines.push(`• ${tl(lang, 'ann_item', {
       n: l.n, from: l.from, to: l.to, verdict: tl(lang, `v_${l.verdict}`),
-      reason: tl(lang, l.reason, { pm: num(l.pm), cat: catName(l.pm, lang) }),
+      reason: tl(lang, l.reason, { pm: fmtPm(l.pm), cat: catName(l.pm, lang) }),
     })}`);
   }
   const last = sd.lessons[sd.lessons.length - 1];
@@ -383,8 +405,8 @@ function renderSchool() {
   const chip = (attr, val, cur, label) => `<button class="chip" role="radio" ${attr}="${val}" aria-checked="${val === cur}">${esc(label)}</button>`;
   const row = (l) => {
     const res = l.pe && l.verdict
-      ? `<span class="v">${esc(t(`v_${l.verdict}`))}</span><span class="why2">${esc(t(l.reason, { pm: num(l.pm), cat: catName(l.pm) }))}</span>`
-      : `<span class="pm">${l.verdict ? `PM2.5 ${num(l.pm)} · ${num(l.temp)}°` : esc(t(l.reason))}</span>`;
+      ? `<span class="v">${esc(t(`v_${l.verdict}`))}</span><span class="why2">${esc(t(l.reason, { pm: fmtPm(l.pm), cat: catName(l.pm) }))}</span>`
+      : `<span class="pm">${l.verdict ? `PM2.5 ${fmtPm(l.pm)} · ${num(l.temp)}°` : esc(t(l.reason))}</span>`;
     return `<li class="${l.pe && l.verdict ? `v-${l.verdict}` : 'plain'}">
       <span class="ln">${esc(t('lesson', { n: l.n }))}<span class="tm">${l.from}–${l.to}</span></span>
       <label class="pe"><input type="checkbox" data-pe="${l.n}" ${l.pe ? 'checked' : ''}> ${esc(t('pe_label'))}</label>
@@ -467,7 +489,7 @@ function renderHonest() {
     <article class="card"><h2>${esc(t('h_title'))}</h2><p class="small" style="margin-top:6px">${esc(t('h_intro'))}</p></article>
     <article class="card"><h2>${esc(t('h_cams_title'))}</h2>
       <p class="tdnum">${esc(t('h_cams', { n: pk.n, g: num(pk.ground_median), c: num(pk.cams_median), x: num(pk.ground_median / pk.cams_median, 1) }))}</p></article>
-    <article class="card"><h2>${esc(t('h_fc_title'))}</h2><p class="hint">${esc(t('h_fc_hint', { test: m.test }))}</p>
+    <article class="card"><h2>${esc(t('h_fc_title'))}</h2><p class="hint">${esc(t('h_fc_hint', { test: t('test_period') }))}</p>
       <table class="tbl"><thead><tr><th>${esc(t('h_col_h'))}</th><th>${esc(t('h_col_model'))}</th><th>${esc(t('h_col_pers'))}</th><th>${esc(t('h_col_cams'))}</th></tr></thead>
       <tbody>${Object.entries(m.buckets).map(([b, v]) => `<tr><td>${esc(b)}</td><td><b>${f1(v.model)}</b></td><td>${f1(v.persistence)}</td><td>${f1(v.cams)}</td></tr>`).join('')}
       <tr><td><b>1–48</b></td><td><b>${f1(m.mae_model)}</b></td><td>${f1(m.mae_persistence)}</td><td>${f1(m.mae_cams)}</td></tr></tbody></table>
@@ -538,9 +560,11 @@ async function boot(mode = 'live', preferCache = true) {
   if (mode === 'live') refreshSensors(preferCache);
 }
 
+let refreshSeq = 0;
 async function refreshSensors(preferCache) {
+  const seq = ++refreshSeq; // ignore answers of older requests ("Обновить" pressed twice)
   const r = await loadSensors({ preferCache }).catch(() => null);
-  if (!r || state.mode !== 'live') return;
+  if (seq !== refreshSeq || !r || state.mode !== 'live') return;
   if (r.source === 'snapshot' && state.snLoad.source === 'cache') return; // keep the newer cached copy
   state.snLoad = r;
   compute();

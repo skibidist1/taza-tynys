@@ -74,6 +74,7 @@ def test_i18n():
                "r_ok", "r_usg", "r_unhealthy", "r_nodata", "cat_good", "cat_moderate", "cat_usg", "cat_unhealthy", "cat_very", "cat_hazardous",
                "tab_today", "tab_school", "now_title", "cams_says", "school_title", "lesson"}
     assert must_kk <= kk, must_kk - kk
+    assert kk == ru, ru - kk  # all screens are translated
     app = (ROOT / "js" / "app.js").read_text() + (ROOT / "index.html").read_text()
     used = set(re.findall(r"\bt\('([a-z0-9_]+)'", app)) | set(re.findall(r'data-i18n="([a-z0-9_]+)"', app)) \
         | set(re.findall(r"\btl\(\w+, '([a-z0-9_]+)'", app))
@@ -81,11 +82,23 @@ def test_i18n():
         | {f"cat_{c}_{p}" for c in ("good", "moderate", "usg", "unhealthy", "very", "hazardous") for p in ("general", "sensitive")} \
         | {f"prof_{p}" for p in ("general", "sensitive")} | {f"v_{v}" for v in ("yes", "light", "no")} \
         | {"r_ok", "r_usg", "r_unhealthy", "r_nodata", "pick_now", "pick_worst", "vent_now", "vent_later", "vent_short",
-           "src_live", "src_cache", "src_snapshot", "sn_live", "sn_cache", "sn_snapshot", "inv_yes", "inv_no"} \
+           "src_live", "src_cache", "src_snapshot", "sn_live", "sn_cache", "sn_snapshot", "inv_yes", "inv_no", "inv_stable",
+           "r_past", "hero_pe", "vent_plan", "vent_plan_air", "closed_later", "de_peak_under", "de_peak_ok", "test_period"} \
         | {f"f_{f}" for f in ("log_pm_now", "log_cams", "inversion", "wind", "hour")} \
         | {f"d_{d}" for d in ("almaly", "auezov", "bostandyk", "zhetysu", "medeu", "turksib", "alatau", "nauryzbay")}
     missing = (used | dyn) - ru
     assert not missing, missing
+
+
+def test_advice_is_consistent():
+    """Never 'air the room now' inside the closed-windows episode; the suggested airing hour is outside it."""
+    for name, case in out()["consistency"].items():
+        for c in case:
+            bad = set(c["bad"])
+            if c["first"] == "vent_now":
+                assert c["now"] not in bad, (name, c)
+            if c["vent"] is not None:
+                assert c["vent"] not in bad, (name, c)
 
 
 def test_offline_chain():

@@ -32,5 +32,23 @@ out.winterCams = w.hours[w.nowIndex].cams;
 const wd = schoolDays(w.hours, w.nowIndex, DEFAULT_BELLS[1]);
 out.winterSchool = schoolDay(w.hours, wd[0], DEFAULT_BELLS[1], [1, 2, 3, 4, 5, 6, 7]).lessons.map((l) => l.verdict);
 out.dist = distanceKm({ lat: 43.25, lon: 76.9 }, { lat: 43.26, lon: 76.9 });
+// advice consistency on live snapshot and winter archive, every start hour of the first day, both profiles
+out.consistency = {};
+for (const [name, raw, pm] of [['live', snap, near ? near.sensor.pm25 : 20], ['winter', demo, demo.sensors.sensors[0].pm25]]) {
+  const base = buildHours(raw, model, pm, Date.parse(raw.fetchedAt));
+  const cases = [];
+  for (let k = 0; k < 24 && base.nowIndex + k + 48 < base.hours.length; k += 3) {
+    const nowI = base.nowIndex + k;
+    const pmNow = raw.actual ? (raw.actual.pm25[raw.actual.time.indexOf(base.hours[nowI].time)] ?? pm) : pm;
+    const d2 = buildHours(raw, model, pmNow, Date.parse(base.hours[nowI].time + ':00+05:00'));
+    for (const p of Object.keys(PROFILES)) {
+      const a = actions(d2.hours, d2.nowIndex, p)[0];
+      const bad = a.bad ? a.bad.hours.map((h) => h.idx) : [];
+      const vent = a.key === 'vent_plan' ? (a.vent ? a.vent.idx : null) : null;
+      cases.push({ p, first: a.key, now: d2.nowIndex, bad, vent });
+    }
+  }
+  out.consistency[name] = cases;
+}
 out.keys = { ru: Object.keys(DICT.ru), kk: Object.keys(DICT.kk) };
 print(JSON.stringify(out));
