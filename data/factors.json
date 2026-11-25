@@ -1,0 +1,44 @@
+{
+ "version": 1,
+ "sources": {
+  "emep2023": "EMEP/EEA air pollutant emission inventory guidebook 2023, глава 1.A.4 Small combustion (EEA, 2023)",
+  "ipcc2006": "2006 IPCC Guidelines for National Greenhouse Gas Inventories, том 2, глава 1, табл. 1.2 (теплота сгорания по умолчанию)",
+  "team": "Оценка команды Таза Тыныс, уточняйте для своего дома"
+ },
+ "heaters": {
+  "coal_stove": {
+   "fuel": "coal",
+   "pm25_g_per_gj": {"value": 450, "low": 216, "high": 480, "source": "emep2023", "ref": "Tier 2, табл. 3-14: печи на твёрдом топливе (кроме биомассы)"},
+   "efficiency": {"value": 0.45, "low": 0.40, "high": 0.50, "source": "emep2023", "ref": "раздел 2: обычные печи, КПД 40–50 %"}
+  },
+  "coal_advanced": {
+   "fuel": "coal",
+   "pm25_g_per_gj": {"value": 220, "low": 72, "high": 230, "source": "emep2023", "ref": "Tier 2, табл. 3-19: усовершенствованные печи на угле"},
+   "efficiency": {"value": 0.70, "low": 0.60, "high": 0.80, "source": "emep2023", "ref": "раздел 2: теплоёмкие и усовершенствованные печи, КПД 60–80 %"}
+  },
+  "wood_stove": {
+   "fuel": "wood",
+   "pm25_g_per_gj": {"value": 740, "low": 370, "high": 1480, "source": "emep2023", "ref": "Tier 2, табл. 3-40: обычные печи на дровах"},
+   "efficiency": {"value": 0.45, "low": 0.40, "high": 0.50, "source": "emep2023", "ref": "раздел 2: обычные печи, КПД 40–50 %"}
+  },
+  "gas_boiler": {
+   "fuel": "gas",
+   "pm25_g_per_gj": {"value": 0.20, "low": 0.12, "high": 0.28, "source": "emep2023", "ref": "Tier 2, табл. 3-16: бытовые газовые котлы до 50 кВт"},
+   "efficiency": {"value": 0.85, "low": 0.80, "high": 0.90, "source": "emep2023", "ref": "раздел 2: стандартные котлы, КПД выше 80 %"}
+  },
+  "electric": {
+   "fuel": "electricity",
+   "pm25_g_per_gj": {"value": 0, "low": 0, "high": 0, "source": "team", "ref": "у дома дыма нет; выбросы переносятся на электростанцию и в этот расчёт не входят"},
+   "efficiency": {"value": 0.98, "low": 0.95, "high": 1.0, "source": "team", "ref": "оценка: электрокотёл почти всё электричество превращает в тепло"}
+  }
+ },
+ "fuels": {
+  "coal": {"unit": "t", "ncv_gj_per_unit": {"value": 18.9, "low": 11.5, "high": 26.0, "source": "ipcc2006", "ref": "суббитуминозный уголь, 18,9 ТДж/Гг (11,5–26,0)"}, "price_kzt": 35000},
+  "wood": {"unit": "t", "ncv_gj_per_unit": {"value": 15.6, "low": 7.9, "high": 31.0, "source": "ipcc2006", "ref": "древесина, 15,6 ТДж/Гг (7,9–31)"}, "price_kzt": 25000},
+  "gas": {"unit": "m3", "ncv_gj_per_unit": {"value": 0.0336, "low": 0.032, "high": 0.035, "source": "ipcc2006", "ref": "природный газ 48,0 ТДж/Гг × плотность около 0,7 кг/м³ (плотность — оценка)"}, "price_kzt": 30},
+  "electricity": {"unit": "kWh", "ncv_gj_per_unit": {"value": 0.0036, "low": 0.0036, "high": 0.0036, "source": "team", "ref": "1 кВт·ч = 3,6 МДж (определение)"}, "price_kzt": 30}
+ },
+ "insulation": {"saving": {"value": 0.20, "low": 0.15, "high": 0.30, "source": "team", "ref": "оценка: утепление чердака, окон и дверей снижает потребность в тепле на 15–30 %"}},
+ "defaults": {"heater": "coal_stove", "amount": 4, "amount_note": "оценка: типичный запас угля на зиму для небольшого дома, впишите свой"},
+ "price_note": "Цены — пример для расчёта, уточните у себя (у поставщиков угля, дров, газа и электроэнергии)."
+}
