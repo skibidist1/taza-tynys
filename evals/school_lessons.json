@@ -1,0 +1,16 @@
+{
+ "lead_hours": 24,
+ "lessons": 496,
+ "dirty": 251,
+ "outdoors_dirty": {
+  "cams": 179,
+  "model": 30,
+  "persistence": 88,
+  "cams_equal_share": 50
+ },
+ "indoor_share": {
+  "cams": 0.192,
+  "model": 0.69,
+  "persistence": 0.458
+ }
+}

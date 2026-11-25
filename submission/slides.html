@@ -169,7 +169,7 @@
     <div class="arrow">→</div>
     <div class="step"><div class="cap"><b>4. Школа</b>3-й урок — в зал, объявление kk/ru</div><img class="phone" src="img/school_announce_ru.png" style="width:390px"></div>
   </div>
-  <p class="small" style="margin:10px 0 0">Зимний пример из архива (кнопка «Зимний пример» или <b>?demo=winter</b>): решение «в зал или нет» совпало с фактом в 13 из 13 уроков этого эпизода (весь день грязный, это лёгкий случай; решает прогноз).</p>
+  <p class="small" style="margin:10px 0 0">Зимний пример из архива (кнопка «Зимний пример» или <b>?demo=winter</b>): реальные данные архива, подписаны на экране как пример из прошлого.</p>
   <div class="num">5</div>
 </section>
 
@@ -210,7 +210,7 @@
         <tr><td>«Будет как сейчас»</td><td>23,1</td><td>53,7</td></tr>
         <tr><td>CAMS как есть</td><td>22,4</td><td>92,4</td></tr>
       </table>
-      <p class="small" style="margin-top:18px">Честно: в сильный смог модель хуже правила «как сейчас». Поэтому датчик «сейчас» учитывается на ближайшие 3 часа, дальше решает прогноз.</p>
+      <p class="small" style="margin-top:18px">В сильный смог модель хуже «как сейчас»: ближайшие 3 часа учитывают и датчик.</p>
     </div>
     <div class="col">
       <p class="muted" style="margin:0 0 10px;font-size:26px">Поймано грязных часов (&gt; 35,4) при равной доле уроков в зале</p>
@@ -220,10 +220,10 @@
         <tr><td>«Будет как сейчас»</td><td>44%</td><td>55%</td><td>66%</td></tr>
         <tr><td>CAMS</td><td>42%</td><td>54%</td><td>64%</td></tr>
       </table>
-      <p class="small" style="margin-top:18px">Честный отрыв: 4–7 пунктов, интервалы перекрываются. Школа держит в зале 72% уроков и ловит 90% грязных часов; у «как сейчас» — 36% и 51%, у CAMS — 19% и 28% (при разной доле не сравнимо).</p>
+      <p class="small" style="margin-top:18px">Отрыв 4–7 пунктов, интервалы перекрываются. Разная доля уроков в зале — подробности в DEFENSE.md.</p>
     </div>
   </div>
-  <p class="small" style="margin:0">Станция OpenAQ 8876, тест фев–мар и окт–ноя 2025; соседние часы автокоррелированы. Воспроизводится: pipeline/train_forecast.py → evals/forecast_report.md.</p>
+  <p class="small" style="margin:0">Станция OpenAQ 8876, тест фев–мар и окт–ноя 2025. Воспроизводится: pipeline/train_forecast.py → evals/forecast_report.md.</p>
   <div class="num">7</div>
 </section>
 

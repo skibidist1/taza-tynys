@@ -19,8 +19,8 @@ background:radial-gradient(900px 500px at 100% 0%,rgba(159,216,200,.6),transpare
 .small{font-size:26px;color:#4d6661}
 </style></head><body>
 <div class="phone"><iframe id="app" src="URL"></iframe></div>
-<div class="cap" id="c1" style="top:70px"><div class="k">Станция у школы, PM2.5</div><div class="v" style="color:#b04a3c">125</div></div>
-<div class="cap" id="c2" style="top:250px"><div class="k">Модель Copernicus CAMS</div><div class="v">41</div></div>
+<div class="cap" id="c1" style="top:70px"><div class="k">Во дворе школы, PM2.5, мкг/м³</div><div class="v" style="color:#b04a3c">125</div><div class="small" style="margin-top:6px;color:#b04a3c;font-weight:700">в 8 раз выше нормы ВОЗ (15)</div></div>
+<div class="cap" id="c2" style="top:250px"><div class="k">Глобальная модель CAMS: «можно на улицу»</div><div class="v">41</div></div>
 <div class="cap" id="c3" style="top:440px"><span class="pill">→ физкультура в зале</span></div>
 <div class="cap" id="c4" style="top:560px"><div class="small">6 февраля 2025, 09:00 · реальный архив</div></div>
 </body></html>"""
@@ -44,11 +44,11 @@ def main():
         pg.wait_for_timeout(400)
         r = Rec(pg, "s1_hook", scroller=app)
         show = lambda i: pg.evaluate(f"document.getElementById('c{i}').classList.add('on')")  # noqa: E731
-        r.hold(0.6); show(1); r.at(2.6)
-        show(2); r.at(4.8)
-        show(3); r.at(7.0)
-        show(4)
-        r.scroll(r.top(".scale-card", 8), 1.6)
+        r.hold(0.6); show(4); r.at(3.2)
+        show(1); r.at(8.6)
+        show(2); r.at(12.3)
+        show(3); r.at(13.6)
+        r.scroll(r.top(".scale-card", 8), 1.2)
         r.until(D)
         r.encode()
         b.close()
