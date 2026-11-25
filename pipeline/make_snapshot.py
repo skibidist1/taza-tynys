@@ -10,10 +10,10 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-COMMON = "latitude=43.24&longitude=76.89&timezone=Asia%2FAlmaty&past_days=1&forecast_days=4"
+COMMON = "latitude=43.24&longitude=76.89&timezone=Asia%2FAlmaty&past_days=1&forecast_days=3"
 AIR = f"https://air-quality-api.open-meteo.com/v1/air-quality?{COMMON}&hourly=pm2_5,pm10,us_aqi"
 WX = (f"https://api.open-meteo.com/v1/forecast?{COMMON}"
-      "&hourly=temperature_2m,wind_speed_10m,boundary_layer_height&wind_speed_unit=ms")
+      "&hourly=temperature_2m,temperature_850hPa,wind_speed_10m,boundary_layer_height&wind_speed_unit=ms")
 
 
 def get(url):

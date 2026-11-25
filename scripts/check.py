@@ -1,6 +1,8 @@
 """Static checks for the Taza Tynys PWA. Run: python3 scripts/check.py
 
-- data/model.json matches the model contract and pipeline/trap_features.FEATURES
+- data/forecast_model.json matches the contract and pipeline/forecast_features.FEATURES
+- data/sensors_snapshot.json: sensors with coordinates, liveCount consistent
+- api/*.py talks only to airkaz.org and data.sensor.community
 - data/snapshot.json, data/demo_winter.json: valid raw Open-Meteo shape
 - every file listed in the sw.js cache exists; local links in index.html exist
 - app files reach out only to api.open-meteo.com and air-quality-api.open-meteo.com
@@ -13,7 +15,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "pipeline"))
-from trap_features import FEATURES  # noqa: E402
+from forecast_features import FEATURES, HORIZON  # noqa: E402
 
 ALLOWED_HOSTS = {"api.open-meteo.com", "air-quality-api.open-meteo.com"}
 APP_FILES = ["index.html", "styles.css", "sw.js", "manifest.webmanifest", "vercel.json"] + \
@@ -42,26 +44,45 @@ def finite(v):
 
 
 def check_model():
-    m = load("data/model.json")
+    m = load("data/forecast_model.json")
     if not m:
         return
-    for k in ("features", "mean", "std", "coef", "intercept", "threshold", "trained_on", "metrics"):
-        if k not in m:
-            err(f"model.json: missing '{k}'")
     if m.get("features") != FEATURES:
-        err(f"model.json: features {m.get('features')} != pipeline FEATURES {FEATURES}")
+        err(f"forecast_model.json: features {m.get('features')} != pipeline FEATURES {FEATURES}")
     n = len(FEATURES)
-    for k in ("mean", "std", "coef"):
+    for k in ("mean", "std"):
         v = m.get(k, [])
         if len(v) != n or not all(finite(x) for x in v):
-            err(f"model.json: '{k}' must be {n} finite numbers")
+            err(f"forecast_model.json: '{k}' must be {n} finite numbers")
     if any(s <= 0 for s in m.get("std", [1])):
-        err("model.json: std must be > 0")
-    if not finite(m.get("intercept")) or not (0 < m.get("threshold", -1) < 1):
-        err("model.json: bad intercept/threshold")
-    for k in ("auc", "precision", "recall", "baseline_temp_only_auc", "baseline_hour_only_auc"):
-        if not (0 <= m.get("metrics", {}).get(k, -1) <= 1):
-            err(f"model.json: metrics.{k} missing or out of [0,1]")
+        err("forecast_model.json: std must be > 0")
+    hz = m.get("horizons", [])
+    if len(hz) != HORIZON:
+        err(f"forecast_model.json: need {HORIZON} horizons, got {len(hz)}")
+    for k, h in enumerate(hz, 1):
+        if h.get("h") != k or len(h.get("coef", [])) != n or not finite(h.get("intercept")) or not (0.5 < h.get("smear", 0) < 3):
+            err(f"forecast_model.json: bad horizon {k}")
+    for k in ("mae_model", "mae_persistence", "mae_cams"):
+        if not (finite(m.get("metrics", {}).get(k)) and m["metrics"][k] > 0):
+            err(f"forecast_model.json: metrics.{k} missing")
+
+
+def check_sensors(rel):
+    d = load(rel)
+    if not d:
+        return
+    if not isinstance(d.get("sensors"), list) or not d["sensors"]:
+        err(f"{rel}: no sensors")
+        return
+    for s in d["sensors"]:
+        if not (finite(s.get("lat")) and finite(s.get("lon"))) or "ok" not in s:
+            err(f"{rel}: sensor {s.get('id')} lacks lat/lon/ok")
+            break
+    ok = [s for s in d["sensors"] if s["ok"]]
+    if d.get("liveCount") != len(ok):
+        err(f"{rel}: liveCount {d.get('liveCount')} != {len(ok)} ok sensors")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", d.get("fetchedAt", "")):
+        err(f"{rel}: fetchedAt missing")
 
 
 def check_raw(rel, min_hours=96):
@@ -76,7 +97,7 @@ def check_raw(rel, min_hours=96):
         for k in ("pm2_5", "pm10", "us_aqi"):
             if len(a[k]) != n:
                 err(f"{rel}: air.{k} length mismatch")
-        for k in ("temperature_2m", "wind_speed_10m", "boundary_layer_height"):
+        for k in ("temperature_2m", "temperature_850hPa", "wind_speed_10m", "boundary_layer_height"):
             if len(w[k]) != len(w["time"]):
                 err(f"{rel}: weather.{k} length mismatch")
         if a["time"] != w["time"]:
@@ -106,7 +127,7 @@ def check_sw():
             err(f"sw.js: cached file missing: {a}")
     # every runtime module and data file the app loads must be cached for offline use
     must = [str(p.relative_to(ROOT)) for p in (ROOT / "js").glob("*.js")] + \
-        ["data/model.json", "data/snapshot.json", "data/demo_winter.json", "index.html", "styles.css"]
+        ["data/forecast_model.json", "data/snapshot.json", "data/sensors_snapshot.json", "data/demo_winter.json", "index.html", "styles.css"]
     for f in must:
         if f not in assets:
             err(f"sw.js: {f} is not in the offline cache")
@@ -138,10 +159,24 @@ def check_external_urls():
             err(f"{rel}: external font/CDN reference")
 
 
+API_HOSTS = {"airkaz.org", "data.sensor.community"}
+
+
+def check_api():
+    """The serverless function may only talk to the two sensor sources."""
+    for p in (ROOT / "api").glob("*.py"):
+        for url in re.findall(r"https?://[^\s'\"]+", p.read_text()):
+            host = re.sub(r"^https?://", "", url).split("/")[0]
+            if host not in API_HOSTS:
+                err(f"{p.relative_to(ROOT)}: external URL not allowed: {url}")
+
+
 def main():
     check_model()
     check_raw("data/snapshot.json")
-    check_raw("data/demo_winter.json")
+    check_raw("data/demo_winter.json", min_hours=72)
+    check_sensors("data/sensors_snapshot.json")
+    check_api()
     check_sw()
     check_links()
     check_external_urls()

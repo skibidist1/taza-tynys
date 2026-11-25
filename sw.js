@@ -1,6 +1,6 @@
 // Service worker: versioned cache for the app shell and local data, network for Open-Meteo
 // (the app itself keeps the last forecast in localStorage).
-const VERSION = 'taza-v2';
+const VERSION = 'taza-v3';
 const ASSETS = [
   './',
   'index.html',
@@ -9,9 +9,11 @@ const ASSETS = [
   'js/app.js',
   'js/i18n.js',
   'js/data.js',
-  'js/trap.js',
+  'js/forecast.js',
   'js/advice.js',
-  'data/model.json',
+  'data/forecast_model.json',
+  'data/sensors_snapshot.json',
+  'data/small_sample.json',
   'data/snapshot.json',
   'data/demo_winter.json',
   'icons/icon.svg',

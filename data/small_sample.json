@@ -1,0 +1,37 @@
+{
+ "generated": "2026-11-25T09:43",
+ "snapshot": "2026-11-25T09:35+05:00",
+ "log_lines": 2,
+ "results": [
+  {
+   "sample": "A: AirKaz, последние сутки",
+   "sensor": "Жана Кайрат",
+   "lat": 43.312,
+   "lon": 77.001,
+   "hours": 23,
+   "pairs": 253,
+   "mae": {
+    "model": 19.28751921511672,
+    "persistence": 24.514545454545456,
+    "cams": 27.434545454545454
+   },
+   "sensor_median": 36.17,
+   "cams_median": 9.8
+  },
+  {
+   "sample": "A: AirKaz, последние сутки",
+   "sensor": "Звездная поляна",
+   "lat": 43.1333,
+   "lon": 76.8695,
+   "hours": 23,
+   "pairs": 253,
+   "mae": {
+    "model": 9.450078014972416,
+    "persistence": 10.042687747035574,
+    "cams": 15.523754940711461
+   },
+   "sensor_median": 6.42,
+   "cams_median": 24.2
+  }
+ ]
+}
