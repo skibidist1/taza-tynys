@@ -1,11 +1,10 @@
-import { t, num, getLang, setLang, weekday, dateLong, hhmm, hhPlus1 } from './i18n.js';
+import { t, tl, num, getLang, setLang, weekday, dateLong, hhmm, hhPlus1 } from './i18n.js';
 import { loadForecast, normalize } from './data.js';
 import { explain } from './trap.js';
 import {
   levelOf, LEVEL_KEYS, WHO_STEPS, PROFILES, dayStats, relOf, findWindows, actions, nextSmog,
-  schoolDay, schoolDays, groupLessons,
+  schoolDay, schoolDays, DEFAULT_BELLS, DEFAULT_PE, validTime,
 } from './advice.js';
-import { computeHouse, HEATER_ORDER } from './calc.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -18,14 +17,12 @@ const store = {
 
 const state = {
   model: null,
-  factors: null,
   load: null,
   data: null,
   profile: store.get('profile', 'child'),
   tab: 'today',
   sel: null,
   schoolDay: null,
-  house: store.get('house', null),
 };
 
 function dayName(day) {
@@ -201,12 +198,15 @@ function renderWhy() {
   if (!h.x) { el.innerHTML = `<article class="card"><p>—</p></article>`; return; }
   const ex = explain(m, h.x);
   const g = Object.fromEntries(ex.groups.map((x) => [x.key, x]));
-  const parts = [
-    g.wind.value < 1.0 ? t('story_calm', { v: num(g.wind.value, 1) })
-      : g.wind.value < 2.0 ? t('story_weak', { v: num(g.wind.value, 1) }) : t('story_wind', { v: num(g.wind.value, 1) }),
-    g.temp.value < -2 ? t('story_cold', { v: num(g.temp.value, 1) }) : t('story_mild', { v: num(g.temp.value, 1) }),
-    g.blh.value < 150 ? t('story_lid', { v: num(g.blh.value) }) : t('story_high', { v: num(g.blh.value) }),
-  ].join('; ');
+  const sign = (v, eps) => (v > eps ? 'up' : v < -eps ? 'down' : 'n');
+  const partList = [
+    t(`story_wind_${sign(g.wind.logit, 0.1)}`, { v: num(g.wind.value, 1) }),
+    t(`story_temp_${sign(g.temp.logit, 0.1)}`, { v: num(g.temp.value, 1) }),
+    t(`story_blh_${sign(g.blh.logit, 0.1)}`, { v: num(g.blh.value) }),
+  ];
+  const hs = sign(g.hour.logit, 0.3);
+  if (hs !== 'n') partList.push(t(`story_hour_${hs}`, { t: hhmm(h.time) }));
+  const parts = partList.join('; ');
   const story = ex.trap ? t('why_story_on', { parts }) : t('why_story_off', { parts });
   const maxAbs = Math.max(1.2, ...ex.groups.map((x) => Math.abs(x.logit)));
   const valText = (x) => {
@@ -253,6 +253,13 @@ function renderWhy() {
         prec: num(mt.precision, 2), rec: num(mt.recall, 2),
       }))}</p>
       <p class="small" style="margin-top:6px"><a href="evals/trap_report.md">${esc(t('model_report'))}</a></p>
+    </article>
+    <article class="card td">
+      <h2>${esc(t('td_title'))}</h2>
+      <p style="margin-top:6px">${esc(t('td_steps'))}</p>
+      <p class="tdnum">${esc(t('td_num'))}</p>
+      <p class="small">${esc(t('td_caveat'))}</p>
+      <p class="ref">${esc(t('td_src'))}</p>
     </article>`;
   el.querySelectorAll('[data-pick]').forEach((b) => {
     b.onclick = () => { state.sel = Number(b.dataset.pick); renderStrip(); renderWhy(); };
@@ -260,134 +267,153 @@ function renderWhy() {
 }
 
 // ---------- school ----------
-function announcement(sd) {
-  const groups = groupLessons(sd.lessons);
-  const plan = groups.map((g) => `${g.from === g.to ? t('ann_lesson', { n: g.from }) : t('ann_lessons', { from: g.from, to: g.to })} — ${t(`v_${g.verdict}`)}`).join('; ');
-  const lines = [t('ann_head'), t('ann_body', { date: dateLong(sd.day), plan })];
-  const idx = state.data.hours.findIndex((h) => h.time === `${sd.day}T15:00`);
-  if (idx >= 0) {
-    const smog = nextSmog(state.data.hours, idx);
-    if (smog && smog.from.slice(0, 10) === sd.day) {
-      const real = smog.max > 37.5 || smog.hours.some((x) => x.trap?.on);
-      lines.push(t(real ? 'ann_smog' : 'ann_dirty', { from: hhmm(smog.from) }));
+function schoolCfg() {
+  const c = store.get('school', null) || {};
+  return {
+    shift: c.shift === 2 ? 2 : 1,
+    group: c.group === 'junior' ? 'junior' : 'senior',
+    bells: { 1: c.bells?.[1] || DEFAULT_BELLS[1], 2: c.bells?.[2] || DEFAULT_BELLS[2] },
+    pe: { 1: c.pe?.[1] || DEFAULT_PE[1], 2: c.pe?.[2] || DEFAULT_PE[2] },
+  };
+}
+
+function announcement(sd, lang) {
+  const g = tl(lang, `g_${sd.group}`);
+  const lines = [tl(lang, 'ann_head'), tl(lang, 'ann_intro', { date: dateLong(sd.day, lang), group: g })];
+  const pe = sd.lessons.filter((l) => l.pe && l.verdict);
+  if (!pe.length) lines.push(tl(lang, 'ann_none'));
+  for (const l of pe) {
+    lines.push(`• ${tl(lang, 'ann_item', {
+      n: l.n, from: l.from, to: l.to, verdict: tl(lang, `v_${l.verdict}`),
+      reason: tl(lang, l.reason, { pm: num(l.pm), thr: num(l.thr, 1), group: g }),
+    })}`);
+  }
+  const last = sd.lessons[sd.lessons.length - 1];
+  if (last) {
+    const endH = Number(last.to.slice(0, 2)) + (Number(last.to.slice(3, 5)) > 0 ? 1 : 0);
+    const endHour = `${sd.day}T${String(endH).padStart(2, '0')}:00`;
+    const idx = state.data.hours.findIndex((h) => h.time === endHour);
+    if (idx >= 0) {
+      const smog = nextSmog(state.data.hours, idx);
+      if (smog && smog.from.slice(0, 10) === sd.day) {
+        const real = smog.max > 37.5 || smog.hours.some((x) => x.trap?.on);
+        lines.push(tl(lang, real ? 'ann_smog' : 'ann_dirty', { from: hhmm(smog.from) }));
+      }
     }
   }
-  lines.push(t('ann_src'));
+  lines.push(tl(lang, 'ann_src'));
   return lines.join('\n');
+}
+
+async function copyText(text, btn, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = t('copied');
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    btn.textContent = ok ? t('copied') : t('copy_fail');
+  }
+  setTimeout(() => { btn.textContent = label; }, 2500);
 }
 
 function renderSchool() {
   const el = $('#view-school');
-  const days = schoolDays(state.data.hours, state.data.nowIndex);
-  if (!days.length) { el.innerHTML = `<article class="card"><h2>${esc(t('school_title'))}</h2><p>${esc(t('school_none'))}</p></article>`; return; }
-  if (!days.includes(state.schoolDay)) state.schoolDay = days[0];
-  const sd = schoolDay(state.data.hours, state.schoolDay);
-  const ann = announcement(sd);
+  const cfg = schoolCfg();
+  const bells = cfg.bells[cfg.shift];
+  const pe = cfg.pe[cfg.shift];
+  const save = () => { store.set('school', cfg); renderSchool(); };
+  const days = schoolDays(state.data.hours, state.data.nowIndex, bells);
+  if (!days.includes(state.schoolDay)) state.schoolDay = days[0] || null;
+  const sd = state.schoolDay ? schoolDay(state.data.hours, state.schoolDay, bells, pe, cfg.group) : null;
+  const chip = (attr, val, cur, label) => `<button class="chip" role="radio" ${attr}="${val}" aria-checked="${val === cur}">${esc(label)}</button>`;
+  const row = (l) => {
+    const verdict = l.pe && l.verdict
+      ? `<span class="v">${esc(t(`v_${l.verdict}`))}</span><span class="why2">${esc(t(l.reason, { pm: num(l.pm), thr: num(l.thr, 1), group: t(`g_${cfg.group}`) }))}</span>`
+      : `<span class="pm">${l.verdict ? `PM2.5 ${num(l.pm)} · ${num(l.temp)}°` : esc(t('r_nodata'))}</span>`;
+    return `<li class="${l.pe && l.verdict ? `v-${l.verdict}` : 'plain'}">
+      <span class="ln">${esc(t('lesson', { n: l.n }))}<span class="tm">${l.from}–${l.to}</span></span>
+      <label class="pe"><input type="checkbox" data-pe="${l.n}" ${l.pe ? 'checked' : ''}> ${esc(t('pe_label'))}</label>
+      <span class="res">${verdict}</span></li>`;
+  };
   el.innerHTML = `<article class="card">
       <div class="card-head"><h2>${esc(t('school_title'))}</h2><p class="hint">${esc(t('school_hint'))}</p></div>
-      <div class="days">${days.map((d) => `<button class="chip" role="radio" data-d="${d}" aria-checked="${d === state.schoolDay}">${esc(dayName(d))}, ${esc(dateLong(d))}</button>`).join('')}</div>
-      <ul class="lessons">${sd.lessons.filter((l) => l.verdict).map((l) => `
-        <li class="v-${l.verdict}"><span>${esc(t('lesson', { n: l.n }))}</span><span class="tm">${l.from}–${l.to}</span>
-        <span class="v">${esc(t(`v_${l.verdict}`))}</span><span class="pm">PM2.5 ${num(l.pm)} · ${num(l.temp)}°</span></li>`).join('')}</ul>
-      <p class="hint" style="margin-top:10px">${esc(t('school_rule'))}</p>
+      <div class="days">${chip('data-shift', 1, cfg.shift, t('shift_1'))}${chip('data-shift', 2, cfg.shift, t('shift_2'))}
+        <span class="sep"></span>${chip('data-group', 'junior', cfg.group, t('g_junior_chip'))}${chip('data-group', 'senior', cfg.group, t('g_senior_chip'))}</div>
+      ${days.length ? `<div class="days">${days.map((d) => chip('data-d', d, state.schoolDay, `${dayName(d)}${dayName(d).includes(dateLong(d)) ? '' : `, ${dateLong(d)}`}`)).join('')}</div>` : `<p>${esc(t('school_none'))}</p>`}
+      ${sd ? `<ul class="lessons">${sd.lessons.map(row).join('')}</ul>` : ''}
+      ${sd && !pe.length ? `<p class="hint" style="margin-top:8px">${esc(t('no_pe'))}</p>` : ''}
+      <details class="bells"><summary>${esc(t('bells_edit'))}</summary>
+        <div class="bell-list">${bells.map(([a, b], i) => `<div class="bell"><span>${esc(t('lesson', { n: i + 1 }))}</span>
+          <input type="time" data-bell="${i}" data-k="0" value="${a}" required> – <input type="time" data-bell="${i}" data-k="1" value="${b}" required></div>`).join('')}</div>
+        <div class="days"><button class="ghost" id="bell-add" type="button">${esc(t('bells_add'))}</button>
+          <button class="ghost" id="bell-rm" type="button">${esc(t('bells_remove'))}</button>
+          <button class="ghost" id="bell-reset" type="button">${esc(t('bells_reset'))}</button></div>
+      </details>
     </article>
-    <article class="card">
-      <div class="ann" id="ann">${esc(ann)}</div>
-      <button class="btn" id="copy" type="button">${esc(t('copy_btn'))}</button>
-    </article>`;
+    ${sd ? `<article class="card">
+      <h2>${esc(t('ann_title'))}</h2>
+      <div class="ann" id="ann-ru">${esc(announcement(sd, 'ru'))}</div>
+      <button class="btn" id="copy-ru" type="button">${esc(t('copy_ru'))}</button>
+      <div class="ann" id="ann-kk">${esc(announcement(sd, 'kk'))}</div>
+      <button class="btn" id="copy-kk" type="button">${esc(t('copy_kk'))}</button>
+    </article>` : ''}
+    <article class="card"><p class="small">${esc(t('school_method'))}</p></article>`;
+
+  el.querySelectorAll('[data-shift]').forEach((b) => { b.onclick = () => { cfg.shift = Number(b.dataset.shift); state.schoolDay = null; save(); }; });
+  el.querySelectorAll('[data-group]').forEach((b) => { b.onclick = () => { cfg.group = b.dataset.group; save(); }; });
   el.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => { state.schoolDay = b.dataset.d; renderSchool(); }; });
-  $('#copy').onclick = async () => {
-    const btn = $('#copy');
-    try {
-      await navigator.clipboard.writeText(ann);
-      btn.textContent = t('copied');
-    } catch {
-      const r = document.createRange();
-      r.selectNodeContents($('#ann'));
-      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-      let ok = false;
-      try { ok = document.execCommand('copy'); } catch { ok = false; }
-      btn.textContent = ok ? t('copied') : t('copy_fail');
-    }
-    setTimeout(() => { btn.textContent = t('copy_btn'); }, 2500);
-  };
-}
-
-// ---------- home ----------
-const DEFAULT_AMOUNT = { coal_stove: 4, coal_advanced: 3, wood_stove: 6, gas_boiler: 2500, electric: 20000 };
-
-function renderHome() {
-  const f = state.factors;
-  const el = $('#view-home');
-  const hs = state.house || { heater: f.defaults.heater, amount: f.defaults.amount, insulate: false, prices: {} };
-  state.house = hs;
-  const res = computeHouse(f, hs);
-  const base = res.base;
-  const maxPm = Math.max(...res.options.map((o) => o.pm_kg_high), base.pm_kg_high, 1);
-  const unit = (u) => t(`u_${u}`);
-  const fmtAmt = (o) => `${num(o.amount, o.unit === 't' ? 1 : 0)} ${unit(o.unit)}`;
-  const delta = (o) => {
-    if (base.pm_kg === 0) return { txt: t('same'), cls: '' };
-    const raw = ((o.pm_kg - base.pm_kg) / base.pm_kg) * 100;
-    const d = Math.round(raw);
-    if (d === 0) return { txt: t('same'), cls: '' };
-    const v = Math.abs(raw) >= 99 && Math.abs(raw) < 100 ? num(Math.floor(Math.abs(raw) * 10) / 10, 1) : num(Math.abs(d));
-    return d < 0 ? { txt: t('pm_cut', { v }), cls: 'good' } : { txt: t('pm_more', { v }), cls: 'bad' };
-  };
-  const srcName = (k) => f.sources[k];
-  el.innerHTML = `<article class="card">
-      <div class="card-head"><h2>${esc(t('home_title'))}</h2><p class="hint">${esc(t('home_hint'))}</p></div>
-      <div class="form">
-        <div class="field"><span>${esc(t('heater'))}</span>
-          <div class="heaters">${HEATER_ORDER.map((k) => `<button class="chip" role="radio" data-h="${k}" aria-checked="${k === hs.heater}">${esc(t(`h_${k}`))}</button>`).join('')}</div></div>
-        <label class="field"><span>${esc(t('amount'))} <span class="est">${esc(t('est'))}</span></span>
-          <span class="inrow"><input type="number" id="amount" min="0" step="any" value="${hs.amount}" inputmode="decimal"> ${esc(unit(f.fuels[f.heaters[hs.heater].fuel].unit))}</span></label>
-        <label class="check"><input type="checkbox" id="insulate" ${hs.insulate ? 'checked' : ''}> <span>${esc(t('insulate'))} <span class="est">−${num(f.insulation.saving.low * 100)}…${num(f.insulation.saving.high * 100)}% ${esc(t('est'))}</span></span></label>
-        <details><summary>${esc(t('prices'))}</summary>
-          <div class="prices">${Object.keys(f.fuels).map((k) => `<label class="field"><span>${esc(t(`p_${k}`))}</span>
-            <input type="number" min="0" step="any" data-price="${k}" value="${hs.prices?.[k] ?? f.fuels[k].price_kzt}"></label>`).join('')}</div>
-          <p class="hint" style="margin-top:8px">${esc(f.price_note)}</p>
-        </details>
-      </div>
-    </article>
-    <article class="card">
-      <p class="small">${esc(t('res_now'))}</p>
-      <div class="bigres">${esc(t('res_kg', { v: num(base.pm_kg, 1) }))}</div>
-      <p class="small">${esc(t('res_range', { lo: num(base.pm_kg_low, 1), hi: num(base.pm_kg_high, 1) }))} · ${esc(t('col_cost'))}: ${num(base.cost_kzt)} ₸</p>
-      <h2 style="margin-top:16px">${esc(t('res_cmp'))}</h2>
-      <div class="opts">${res.options.map((o) => {
-        const d = delta(o);
-        return `<div class="opt ${o.key === hs.heater && !hs.insulate ? 'cur' : ''}">
-          <div class="row"><span class="name">${esc(t(`h_${o.key}`))}${hs.insulate ? esc(t('plus_ins')) : ''}</span><span class="delta ${d.cls}">${esc(d.txt)}</span></div>
-          <div class="pmbar"><i style="width:${(o.pm_kg / maxPm) * 100}%"></i></div>
-          <div class="row meta"><span>PM2.5 ${num(o.pm_kg, o.pm_kg < 1 ? 2 : 1)} кг (${num(o.pm_kg_low, o.pm_kg_low < 1 ? 2 : 1)}–${num(o.pm_kg_high, o.pm_kg_high < 1 ? 2 : 1)})</span>
-            <span>${esc(fmtAmt(o))} · ${num(o.cost_kzt)} ₸</span></div>
-        </div>`;
-      }).join('')}</div>
-      <p class="hint" style="margin-top:12px">${esc(t('home_notes'))}</p>
-    </article>
-    <article class="card">
-      <h2>${esc(t('sources'))}</h2>
-      <ul class="srcs">${HEATER_ORDER.map((k) => {
-        const h = f.heaters[k];
-        return `<li><b>${esc(t(`h_${k}`))}</b>: ${num(h.pm25_g_per_gj.value, 2)} г/ГДж (${num(h.pm25_g_per_gj.low, 2)}–${num(h.pm25_g_per_gj.high, 2)}) — ${esc(srcName(h.pm25_g_per_gj.source))}, ${esc(h.pm25_g_per_gj.ref)}; КПД ${num(h.efficiency.low * 100)}–${num(h.efficiency.high * 100)}% — ${esc(h.efficiency.ref)}</li>`;
-      }).join('')}
-      ${Object.entries(f.fuels).map(([k, v]) => `<li><b>${esc(t(`p_${k}`).split(',')[0])}</b>: ${esc(v.ncv_gj_per_unit.ref)} — ${esc(srcName(v.ncv_gj_per_unit.source))}</li>`).join('')}
-      <li>${esc(f.insulation.saving.ref)} — ${esc(srcName(f.insulation.saving.source))}</li></ul>
-    </article>`;
-
-  const save = () => { store.set('house', state.house); renderHome(); };
-  el.querySelectorAll('[data-h]').forEach((b) => {
-    b.onclick = () => { hs.heater = b.dataset.h; hs.amount = DEFAULT_AMOUNT[hs.heater]; save(); };
-  });
-  $('#amount').onchange = (e) => { const v = Number(e.target.value); if (v >= 0) { hs.amount = v; save(); } };
-  $('#insulate').onchange = (e) => { hs.insulate = e.target.checked; save(); };
-  el.querySelectorAll('[data-price]').forEach((inp) => {
-    inp.onchange = () => {
-      const v = Number(inp.value);
-      if (v >= 0) { hs.prices = { ...(hs.prices || {}), [inp.dataset.price]: v }; save(); el.querySelector('details').open = true; }
+  el.querySelectorAll('[data-pe]').forEach((c) => {
+    c.onchange = () => {
+      const n = Number(c.dataset.pe);
+      const set = new Set(cfg.pe[cfg.shift]);
+      if (c.checked) set.add(n); else set.delete(n);
+      cfg.pe[cfg.shift] = [...set].sort((a, b) => a - b);
+      save();
     };
   });
+  const keepOpen = () => { const d = el.querySelector('details.bells'); if (d) d.open = true; };
+  el.querySelectorAll('[data-bell]').forEach((inp) => {
+    inp.onchange = () => {
+      if (!validTime(inp.value)) return;
+      const nb = cfg.bells[cfg.shift].map((x) => [...x]);
+      nb[Number(inp.dataset.bell)][Number(inp.dataset.k)] = inp.value;
+      cfg.bells[cfg.shift] = nb;
+      save();
+      keepOpen();
+    };
+  });
+  $('#bell-add').onclick = () => {
+    const nb = cfg.bells[cfg.shift].map((x) => [...x]);
+    const last = nb[nb.length - 1] || ['08:00', '08:00'];
+    const m = Number(last[1].slice(0, 2)) * 60 + Number(last[1].slice(3)) + 10;
+    const f = (x) => `${String(Math.floor(x / 60) % 24).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`;
+    nb.push([f(m), f(m + 45)]);
+    cfg.bells[cfg.shift] = nb;
+    save();
+    keepOpen();
+  };
+  $('#bell-rm').onclick = () => {
+    if (cfg.bells[cfg.shift].length <= 1) return;
+    cfg.bells[cfg.shift] = cfg.bells[cfg.shift].slice(0, -1);
+    cfg.pe[cfg.shift] = cfg.pe[cfg.shift].filter((n) => n <= cfg.bells[cfg.shift].length);
+    save();
+    keepOpen();
+  };
+  $('#bell-reset').onclick = () => {
+    cfg.bells[cfg.shift] = DEFAULT_BELLS[cfg.shift];
+    cfg.pe[cfg.shift] = DEFAULT_PE[cfg.shift];
+    save();
+  };
+  if (sd) {
+    $('#copy-ru').onclick = () => copyText(announcement(sd, 'ru'), $('#copy-ru'), t('copy_ru'));
+    $('#copy-kk').onclick = () => copyText(announcement(sd, 'kk'), $('#copy-kk'), t('copy_kk'));
+  }
 }
 
 // ---------- tabs & boot ----------
@@ -405,14 +431,11 @@ function renderAll() {
   renderToday();
   renderWhy();
   renderSchool();
-  renderHome();
 }
 
 async function boot(preferCache = true, mode = 'live') {
   if (!state.model) {
-    const [m, f] = await Promise.all([fetch('data/model.json').then((r) => r.json()), fetch('data/factors.json').then((r) => r.json())]);
-    state.model = m;
-    state.factors = f;
+    state.model = await fetch('data/model.json').then((r) => r.json());
   }
   if (mode === 'archive') {
     // Real winter smog episode from the Open-Meteo archive, replayed as if "now" were its morning.
@@ -431,12 +454,12 @@ async function boot(preferCache = true, mode = 'live') {
 document.querySelectorAll('.tabs button').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 window.addEventListener('hashchange', () => {
   const n = location.hash.slice(1);
-  if (['today', 'why', 'school', 'home'].includes(n) && n !== state.tab) showTab(n);
+  if (['today', 'why', 'school'].includes(n) && n !== state.tab) showTab(n);
 });
 $('#lang').onclick = () => { setLang(getLang() === 'kk' ? 'ru' : 'kk'); renderAll(); };
 applyStatic();
 const initial = location.hash.slice(1);
-if (['today', 'why', 'school', 'home'].includes(initial)) showTab(initial);
+if (['today', 'why', 'school'].includes(initial)) showTab(initial);
 boot(true, new URLSearchParams(location.search).get('demo') === 'winter' ? 'archive' : 'live').catch((e) => {
   $('#hero').innerHTML = `<p class="loading">Ошибка загрузки: ${esc(e.message || e)}</p>`;
 });

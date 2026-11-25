@@ -157,57 +157,71 @@ export function actions(hours, nowIndex, profileKey) {
 }
 
 // ---- School mode -------------------------------------------------------
+//
+// Outdoor PE decision per lesson. Thresholds are WHO 2021 PM2.5 24-hour interim
+// targets applied to hourly CAMS values (IT-4 25, IT-3 37.5 ug/m3); juniors
+// (grades 1-4) get the stricter rule because children are more vulnerable to
+// air pollution (WHO, "Air pollution and child health: prescribing clean air", 2018).
 
-export const LESSONS = [
-  ['08:00', '08:45'], ['08:55', '09:40'], ['09:50', '10:35'], ['10:55', '11:40'],
-  ['11:50', '12:35'], ['12:45', '13:30'], ['13:40', '14:25'], ['14:30', '15:00'],
-];
+export const DEFAULT_BELLS = {
+  1: [['08:00', '08:45'], ['08:55', '09:40'], ['09:50', '10:35'], ['10:55', '11:40'], ['11:50', '12:35'], ['12:45', '13:30'], ['13:40', '14:25']],
+  2: [['13:30', '14:15'], ['14:25', '15:10'], ['15:20', '16:05'], ['16:15', '17:00'], ['17:10', '17:55'], ['18:05', '18:50']],
+};
+export const DEFAULT_PE = { 1: [3], 2: [2] };
+export const SCHOOL_RULES = {
+  senior: { outdoor: 25, light: 37.5, relWorstIndoor: false },
+  junior: { outdoor: 25, light: null, relWorstIndoor: true },
+};
 
 const toMin = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+export const validTime = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 
-// verdict: 'yes' (outdoor PE ok), 'light' (outdoor, low intensity), 'no' (indoors)
-export function schoolDay(hours, day) {
-  const dayHours = hours.filter((h) => dayOf(h) === day);
-  const byHour = Object.fromEntries(dayHours.map((h) => [hourOf(h), h]));
-  const lessons = LESSONS.map(([from, to], i) => {
-    const hs = [];
-    for (let hr = Math.floor(toMin(from) / 60); hr * 60 < toMin(to); hr++) if (byHour[hr]) hs.push(byHour[hr]);
-    if (!hs.length) return { n: i + 1, from, to, verdict: null };
-    const pm = Math.max(...hs.map((h) => h.pm25));
-    const trap = hs.some((h) => h.trap?.on);
-    const temp = Math.min(...hs.map((h) => h.temp));
-    let verdict = 'no';
-    if (pm <= 25 && !trap) verdict = 'yes';
-    else if (pm <= 37.5) verdict = 'light';
-    return { n: i + 1, from, to, pm, trap, temp, verdict };
-  });
-  return { day, lessons };
-}
-
-// Group consecutive lessons with the same verdict: [{verdict, from:n, to:n}]
-export function groupLessons(lessons) {
-  const out = [];
-  for (const l of lessons) {
-    if (!l.verdict) continue;
-    const last = out[out.length - 1];
-    if (last && last.verdict === l.verdict && last.to === l.n - 1) last.to = l.n;
-    else out.push({ verdict: l.verdict, from: l.n, to: l.n });
+// Decision for one lesson. Returns { verdict: 'yes'|'light'|'no'|null, reason, pm, thr, trap, temp }
+export function lessonVerdict(hours, stats, day, from, to, group) {
+  const rule = SCHOOL_RULES[group] || SCHOOL_RULES.senior;
+  const hs = hours.filter((h) => dayOf(h) === day && (hourOf(h) + 1) * 60 > toMin(from) && hourOf(h) * 60 < toMin(to));
+  if (!hs.length) return { verdict: null, reason: 'r_nodata' };
+  const worst = hs.reduce((a, b) => (b.pm25 > a.pm25 ? b : a));
+  const pm = worst.pm25;
+  const trap = hs.some((h) => h.trap?.on);
+  const temp = Math.min(...hs.map((h) => h.temp));
+  const base = { pm, trap, temp };
+  if (trap) return { ...base, verdict: 'no', reason: 'r_trap' };
+  if (rule.light === null) {
+    if (pm > rule.outdoor) return { ...base, verdict: 'no', reason: 'r_pm', thr: rule.outdoor };
+    if (rule.relWorstIndoor && relOf(worst, stats) === 'worst') return { ...base, verdict: 'no', reason: 'r_rel' };
+    return { ...base, verdict: 'yes', reason: 'r_ok', thr: rule.outdoor };
   }
-  return out;
+  if (pm > rule.light) return { ...base, verdict: 'no', reason: 'r_pm', thr: rule.light };
+  if (pm > rule.outdoor) return { ...base, verdict: 'light', reason: 'r_light', thr: rule.outdoor };
+  return { ...base, verdict: 'yes', reason: 'r_ok', thr: rule.outdoor };
 }
 
-export function schoolDays(hours, nowIndex) {
-  const seen = [];
-  for (const h of hours.slice(nowIndex, nowIndex + 72)) {
+// bells: [[from, to], ...]; pe: lesson numbers (1-based) with PE
+export function schoolDay(hours, day, bells, pe, group) {
+  const stats = dayStats(hours);
+  const lessons = bells.map(([from, to], i) => {
+    const n = i + 1;
+    const isPe = pe.includes(n);
+    return { n, from, to, pe: isPe, ...lessonVerdict(hours, stats, day, from, to, group) };
+  });
+  return { day, group, lessons };
+}
+
+export function schoolDays(hours, nowIndex, bells) {
+  const lastStart = bells.length ? Math.max(...bells.map((b) => toMin(b[0]))) : 0;
+  const lastEnd = bells.length ? Math.max(...bells.map((b) => toMin(b[1]))) : 0;
+  const out = [];
+  const view = hours.slice(nowIndex, nowIndex + 72);
+  for (const h of view) {
     const d = dayOf(h);
+    if (out.includes(d)) continue;
     const [y, m, dd] = d.split('-').map(Number);
     const dow = new Date(Date.UTC(y, m - 1, dd)).getUTCDay();
-    if (dow === 0 || dow === 6 || seen.includes(d)) continue;
-    // a day counts only if the forecast covers its lessons
-    if (hours.some((x) => dayOf(x) === d && hourOf(x) === 14)) seen.push(d);
+    if (dow === 0 || dow === 6) continue;
+    if (hours.some((x) => dayOf(x) === d && hourOf(x) === Math.floor(lastStart / 60))) out.push(d);
   }
-  // today only if lessons are not over yet
-  const today = dayOf(hours[nowIndex]);
-  if (seen[0] === today && hourOf(hours[nowIndex]) >= 15) seen.shift();
-  return seen;
+  const now = hours[nowIndex];
+  if (out[0] === dayOf(now) && hourOf(now) * 60 >= lastEnd) out.shift();
+  return out;
 }

@@ -43,7 +43,7 @@ def run_js():
     if not jsc:
         return None
     r = subprocess.run(
-        [jsc, "-m", "tests/js_harness.mjs", "--", "tests/model_cases.json", "data/model.json", "data/factors.json"],
+        [jsc, "-m", "tests/js_harness.mjs", "--", "tests/model_cases.json", "data/model.json"],
         cwd=ROOT, capture_output=True, text=True, timeout=60,
     )
     assert r.returncode == 0, r.stderr
@@ -86,20 +86,6 @@ def test_model_contract():
     assert 0 < m["threshold"] < 1 and math.isfinite(m["intercept"])
     # Physically sensible signs for weather features: calmer, colder, lower layer -> higher risk.
     assert m["coef"][0] < 0 and m["coef"][1] < 0 and m["coef"][2] < 0
-
-
-def test_calc_js_matches_python():
-    out = run_js()
-    if out is None:
-        return
-    sys.path.insert(0, str(ROOT / "tests"))
-    from calc_ref import compute_house
-    py = compute_house(load("data/factors.json"), "coal_stove", 4, False)
-    js = out["calc"]
-    for opt_js in js["options"]:
-        opt_py = py[opt_js["key"]]
-        for k in ("pm_kg", "pm_kg_low", "pm_kg_high", "cost_kzt", "amount"):
-            assert close(opt_js[k], opt_py[k], 1e-9), (opt_js["key"], k, opt_js[k], opt_py[k])
 
 
 if __name__ == "__main__":

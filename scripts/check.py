@@ -1,7 +1,6 @@
 """Static checks for the Taza Tynys PWA. Run: python3 scripts/check.py
 
 - data/model.json matches the model contract and pipeline/trap_features.FEATURES
-- data/factors.json: every factor has value/low/high in order and a known source
 - data/snapshot.json, data/demo_winter.json: valid raw Open-Meteo shape
 - every file listed in the sw.js cache exists; local links in index.html exist
 - app files reach out only to api.open-meteo.com and air-quality-api.open-meteo.com
@@ -65,41 +64,6 @@ def check_model():
             err(f"model.json: metrics.{k} missing or out of [0,1]")
 
 
-def check_range(name, r, sources):
-    if not all(finite(r.get(k)) for k in ("value", "low", "high")):
-        err(f"factors.json: {name} needs numeric value/low/high")
-        return
-    if not (r["low"] <= r["value"] <= r["high"]):
-        err(f"factors.json: {name} must satisfy low <= value <= high")
-    if r.get("source") not in sources:
-        err(f"factors.json: {name} has unknown source '{r.get('source')}'")
-    if not r.get("ref"):
-        err(f"factors.json: {name} has no 'ref' text")
-
-
-def check_factors():
-    f = load("data/factors.json")
-    if not f:
-        return
-    src = f.get("sources", {})
-    for k, h in f.get("heaters", {}).items():
-        check_range(f"heaters.{k}.pm25_g_per_gj", h.get("pm25_g_per_gj", {}), src)
-        check_range(f"heaters.{k}.efficiency", h.get("efficiency", {}), src)
-        if not (0 < h.get("efficiency", {}).get("value", 0) <= 1):
-            err(f"factors.json: heaters.{k}.efficiency out of (0,1]")
-        if h.get("fuel") not in f.get("fuels", {}):
-            err(f"factors.json: heaters.{k}.fuel unknown")
-    for k, fu in f.get("fuels", {}).items():
-        check_range(f"fuels.{k}.ncv_gj_per_unit", fu.get("ncv_gj_per_unit", {}), src)
-        if not (finite(fu.get("price_kzt")) and fu["price_kzt"] > 0):
-            err(f"factors.json: fuels.{k}.price_kzt must be > 0")
-    check_range("insulation.saving", f.get("insulation", {}).get("saving", {}), src)
-    if f.get("defaults", {}).get("heater") not in f.get("heaters", {}):
-        err("factors.json: defaults.heater unknown")
-    if not f.get("price_note"):
-        err("factors.json: price_note missing (prices must be marked as examples)")
-
-
 def check_raw(rel, min_hours=96):
     d = load(rel)
     if not d:
@@ -142,7 +106,7 @@ def check_sw():
             err(f"sw.js: cached file missing: {a}")
     # every runtime module and data file the app loads must be cached for offline use
     must = [str(p.relative_to(ROOT)) for p in (ROOT / "js").glob("*.js")] + \
-        ["data/model.json", "data/factors.json", "data/snapshot.json", "data/demo_winter.json", "index.html", "styles.css"]
+        ["data/model.json", "data/snapshot.json", "data/demo_winter.json", "index.html", "styles.css"]
     for f in must:
         if f not in assets:
             err(f"sw.js: {f} is not in the offline cache")
@@ -176,7 +140,6 @@ def check_external_urls():
 
 def main():
     check_model()
-    check_factors()
     check_raw("data/snapshot.json")
     check_raw("data/demo_winter.json")
     check_sw()
