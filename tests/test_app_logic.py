@@ -72,6 +72,16 @@ def test_i18n_keys_complete_and_used():
     assert not missing, missing
 
 
+def test_offline_fallback_chain():
+    r = subprocess.run([JSC, "-m", "tests/offline_harness.mjs", "--", "data/snapshot.json"],
+                       cwd=ROOT, capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr or r.stdout
+    o = json.loads(r.stdout)
+    assert o["offlineNoCache"] == "snapshot", o
+    assert o["online"] == "live" and o["cached"], o
+    assert o["offlineWithCache"] == "cache", o
+
+
 if __name__ == "__main__":
     fails = 0
     for name, fn in list(globals().items()):

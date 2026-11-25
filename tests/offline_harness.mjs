@@ -1,0 +1,33 @@
+// Fallback chain of loadForecast(): live -> localStorage cache -> data/snapshot.json, with stubbed fetch.
+const args = typeof scriptArgs !== 'undefined' ? scriptArgs : arguments;
+const snapText = read(args[0]);
+const snap = JSON.parse(snapText);
+const mem = {};
+globalThis.localStorage = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
+let online = false;
+let calls = 0;
+const resp = (obj) => ({ ok: true, status: 200, json: async () => obj });
+globalThis.fetch = async (url) => {
+  calls++;
+  if (url === 'data/snapshot.json') return resp(JSON.parse(snapText));
+  if (!online) throw new Error('network down');
+  if (url.includes('air-quality-api.open-meteo.com')) return resp(snap.air);
+  if (url.includes('api.open-meteo.com')) return resp(snap.weather);
+  throw new Error(`unexpected ${url}`);
+};
+globalThis.AbortController = class { constructor() { this.signal = {}; } abort() {} };
+globalThis.setTimeout = globalThis.setTimeout || ((f) => 0);
+globalThis.clearTimeout = globalThis.clearTimeout || (() => {});
+const { loadForecast } = await import('../js/data.js');
+const out = {};
+let r = await loadForecast();
+out.offlineNoCache = r.source;
+online = true;
+r = await loadForecast({ preferCache: false });
+out.online = r.source;
+out.cached = !!mem['taza.forecast.v1'];
+online = false;
+r = await loadForecast({ preferCache: false });
+out.offlineWithCache = r.source;
+out.error = r.error;
+print(JSON.stringify(out));

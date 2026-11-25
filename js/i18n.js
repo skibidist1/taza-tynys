@@ -189,7 +189,7 @@ export function t(key, vars = {}) {
 
 export function num(v, digits = 0) {
   if (v === null || v === undefined || Number.isNaN(v)) return '—';
-  return Number(v).toLocaleString(lang === 'kk' ? 'kk-KZ' : 'ru-RU', { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+  return Number(v).toLocaleString('ru-RU', { maximumFractionDigits: digits, minimumFractionDigits: 0 });
 }
 
 const WD = {
