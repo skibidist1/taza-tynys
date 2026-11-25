@@ -1,6 +1,7 @@
 // Service worker: versioned cache for the app shell and local data, network for Open-Meteo
 // (the app itself keeps the last forecast in localStorage).
-const VERSION = 'taza-v3';
+// VERSION = hash of the cached files; scripts/check.py verifies it, `--fix-sw` rewrites it.
+const VERSION = 'taza-0aa40acefb';
 const ASSETS = [
   './',
   'index.html',
@@ -36,7 +37,9 @@ self.addEventListener('activate', (e) => {
 // Stale-while-revalidate: answer from cache at once (works offline), refresh the cache in background.
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return; // API calls go to network
+  // Network only: other origins (Open-Meteo) and our own /api/ (live sensors must never come from this cache;
+  // the app keeps its own dated copy in localStorage).
+  if (e.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.includes('/api/')) return;
   e.respondWith(caches.open(VERSION).then(async (cache) => {
     const hit = await cache.match(e.request, { ignoreSearch: true });
     const net = fetch(e.request).then((res) => {

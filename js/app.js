@@ -1,5 +1,5 @@
 import { t, tl, num, getLang, setLang, weekday, dateLong, hhmm, hhPlus1 } from './i18n.js';
-import { loadForecast, loadSensors, buildHours, nearestSensor } from './data.js';
+import { loadForecast, loadSensors, initialSensors, buildHours, nearestSensor } from './data.js';
 import {
   catOf, CAT_KEYS, EPA_STEPS, PROFILES, findWindows, actions, nextBad, forecastView,
   schoolDay, schoolDays, DEFAULT_BELLS, DEFAULT_PE, validTime,
@@ -475,12 +475,23 @@ async function boot(mode = 'live', preferCache = true) {
     state.actual = Object.fromEntries(demo.actual.time.map((tm, i) => [tm, demo.actual.pm25[i]]));
     state.point = { key: null, name: 'OpenAQ 8876', lat: 43.2529, lon: 76.9312 };
   } else {
-    [state.fcLoad, state.snLoad] = await Promise.all([loadForecast({ preferCache }), loadSensors({ preferCache })]);
+    // First paint from cached/bundled sensors, then refresh them without blocking the screen.
+    [state.fcLoad, state.snLoad] = await Promise.all([loadForecast({ preferCache }), initialSensors()]);
     state.actual = null;
     state.point = store.get('point', { key: 'd_almaly', lat: 43.250, lon: 76.905 });
   }
   state.sel = null;
   state.schoolDay = null;
+  compute();
+  renderAll();
+  if (mode === 'live') refreshSensors(preferCache);
+}
+
+async function refreshSensors(preferCache) {
+  const r = await loadSensors({ preferCache }).catch(() => null);
+  if (!r || state.mode !== 'live') return;
+  if (r.source === 'snapshot' && state.snLoad.source === 'cache') return; // keep the newer cached copy
+  state.snLoad = r;
   compute();
   renderAll();
 }

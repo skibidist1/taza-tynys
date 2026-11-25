@@ -11,6 +11,7 @@ Attribution required in the UI: "данные AirKaz.org, sensor.community".
 import json
 import statistics
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler
 
@@ -21,43 +22,50 @@ AIRKAZ_URL = "https://airkaz.org/almaty.php"
 SC_URL = "https://data.sensor.community/airrohr/v1/filter/area=43.25,76.92,25"
 
 
-def _get(url, timeout=12):
+def _get(url, timeout=6):
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode("utf-8", errors="replace")
 
 
+VALID = (0.0, 500.0)  # PM2.5 outside [0, 500) is a sensor error (e.g. SDS011 in fog reports 999.9, -1 = no data)
+
+
+def _valid(v):
+    return VALID[0] <= v < VALID[1]
+
+
 def parse_airkaz(html, now):
     i = html.find("sensors_data")
     if i < 0:
-        return []
+        raise ValueError("sensors_data marker not found (page layout changed?)")
     start = html.find("[", i)
     data, _ = json.JSONDecoder().raw_decode(html[start:])
     by = {}
     for x in data:
-        try:
+        try:  # one broken row must not kill the whole source
             lat, lon = float(x["lat"]), float(x["lng"])
             stamp = datetime.strptime(x["date"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=ALMATY)
-        except (KeyError, TypeError, ValueError):
-            continue
-        s = by.setdefault(x["id"], {"id": f"ak-{x['id']}", "src": "airkaz", "name": x.get("name") or "",
-                                    "lat": lat, "lon": lon, "updated": stamp.isoformat(timespec="minutes"),
-                                    "history": {}, "pm25": None})
-        if x.get("pm25") in (None, ""):
-            continue
-        v = float(x["pm25"])
-        hour = x.get("hour")
-        if hour == "now":
-            s["pm25"] = v
-            continue
-        try:
+            s = by.setdefault(x["id"], {"id": f"ak-{x['id']}", "src": "airkaz", "name": x.get("name") or "",
+                                        "lat": lat, "lon": lon, "updated": stamp.isoformat(timespec="minutes"),
+                                        "history": {}, "pm25": None})
+            if x.get("pm25") in (None, ""):
+                continue
+            v = float(x["pm25"])
+            if not _valid(v):
+                continue
+            hour = x.get("hour")
+            if hour == "now":
+                s["pm25"] = v
+                continue
             h = int(hour)
-        except (TypeError, ValueError):
+            if not 0 <= h <= 23:
+                continue
+            t = stamp.replace(minute=0, second=0, microsecond=0)
+            t -= timedelta(hours=(t.hour - h) % 24)  # most recent clock hour h not later than the update
+            s["history"][t.strftime("%Y-%m-%dT%H:00")] = v
+        except (KeyError, TypeError, ValueError, AttributeError):
             continue
-        t = stamp.replace(minute=0, second=0, microsecond=0)
-        while t.hour != h:
-            t -= timedelta(hours=1)
-        s["history"][t.strftime("%Y-%m-%dT%H:00")] = v
     out = []
     for s in by.values():
         hist = sorted(s["history"].items())
@@ -75,25 +83,33 @@ def parse_airkaz(html, now):
 def parse_sc(text, now):
     by = {}
     for x in json.loads(text):
-        for v in x.get("sensordatavalues", []):
-            if v.get("value_type") != "P2":
-                continue
-            sid = x["sensor"]["id"]
-            s = by.setdefault(sid, {"id": f"sc-{sid}", "src": "sensor.community",
-                                    "name": f"sensor.community {x['sensor']['sensor_type']['name']} #{sid}",
-                                    "lat": float(x["location"]["latitude"]), "lon": float(x["location"]["longitude"]),
-                                    "vals": [], "updated": None})
-            s["vals"].append(float(v["value"]))
-            ts = datetime.strptime(x["timestamp"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).astimezone(ALMATY)
-            if s["updated"] is None or ts.isoformat() > s["updated"]:
-                s["updated"] = ts.isoformat(timespec="minutes")
+        try:
+            for v in x.get("sensordatavalues", []):
+                if v.get("value_type") != "P2":
+                    continue
+                sid = x["sensor"]["id"]
+                s = by.setdefault(sid, {"id": f"sc-{sid}", "src": "sensor.community",
+                                        "name": f"sensor.community {x['sensor']['sensor_type']['name']} #{sid}",
+                                        "lat": float(x["location"]["latitude"]), "lon": float(x["location"]["longitude"]),
+                                        "vals": [], "bad": 0, "updated": None})
+                val = float(v["value"])
+                if _valid(val):
+                    s["vals"].append(val)
+                else:
+                    s["bad"] += 1
+                ts = datetime.strptime(x["timestamp"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).astimezone(ALMATY)
+                if s["updated"] is None or ts.isoformat() > s["updated"]:
+                    s["updated"] = ts.isoformat(timespec="minutes")
+        except (KeyError, TypeError, ValueError):
+            continue
     out = []
     for s in by.values():
         vals = s.pop("vals")
-        s["pm25"] = round(statistics.mean(vals), 1)
+        bad = s.pop("bad")
+        s["pm25"] = round(statistics.mean(vals), 1) if vals else None
         s["history"] = []
-        s["live"] = now - datetime.fromisoformat(s["updated"]) <= timedelta(hours=LIVE_HOURS)
-        s["suspect"] = False
+        s["live"] = s["pm25"] is not None and now - datetime.fromisoformat(s["updated"]) <= timedelta(hours=LIVE_HOURS)
+        s["suspect"] = bad > 0 or s["pm25"] is None
         out.append(s)
     return out
 
@@ -101,14 +117,14 @@ def parse_sc(text, now):
 def collect():
     now = datetime.now(ALMATY)
     sensors, errors = [], []
-    try:
-        sensors += parse_airkaz(_get(AIRKAZ_URL), now)
-    except Exception as e:  # noqa: BLE001
-        errors.append(f"airkaz: {e}")
-    try:
-        sensors += parse_sc(_get(SC_URL), now)
-    except Exception as e:  # noqa: BLE001
-        errors.append(f"sensor.community: {e}")
+    jobs = {"airkaz": (AIRKAZ_URL, parse_airkaz), "sensor.community": (SC_URL, parse_sc)}
+    with ThreadPoolExecutor(max_workers=2) as ex:  # fetch both sources in parallel
+        futs = {name: ex.submit(_get, url) for name, (url, _) in jobs.items()}
+        for name, (_, parse) in jobs.items():
+            try:
+                sensors += parse(futs[name].result(), now)
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"{name}: {e}")
     for s in sensors:
         s["ok"] = bool(s["live"] and not s["suspect"])
     live = [s["pm25"] for s in sensors if s["ok"]]
@@ -124,9 +140,12 @@ def collect():
 
 class handler(BaseHTTPRequestHandler):  # noqa: N801 (Vercel expects this name)
     def do_GET(self):  # noqa: N802
-        body = json.dumps(collect(), ensure_ascii=False).encode("utf-8")
-        self.send_response(200)
+        data = collect()
+        failed = data["liveCount"] == 0 and data["errors"]
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        # never let a CDN keep an empty answer: both sources down -> 502, no-store
+        self.send_response(502 if failed else 200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "public, s-maxage=600, stale-while-revalidate=1200")
+        self.send_header("Cache-Control", "no-store" if failed else "public, s-maxage=600, stale-while-revalidate=1200")
         self.end_headers()
         self.wfile.write(body)

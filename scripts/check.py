@@ -7,6 +7,7 @@
 - every file listed in the sw.js cache exists; local links in index.html exist
 - app files reach out only to api.open-meteo.com and air-quality-api.open-meteo.com
 """
+import hashlib
 import json
 import math
 import pathlib
@@ -113,7 +114,17 @@ def check_raw(rel, min_hours=96):
         err(f"{rel}: bad shape ({e})")
 
 
-def check_sw():
+def sw_hash(assets):
+    h = hashlib.sha256()
+    for a in sorted(assets):
+        if a in ("./", "sw.js"):
+            continue
+        h.update(a.encode())
+        h.update((ROOT / a).read_bytes())
+    return h.hexdigest()[:10]
+
+
+def check_sw(fix=False):
     sw = (ROOT / "sw.js").read_text()
     m = re.search(r"const ASSETS = \[(.*?)\];", sw, re.S)
     if not m:
@@ -125,6 +136,16 @@ def check_sw():
             continue
         if not (ROOT / a).is_file():
             err(f"sw.js: cached file missing: {a}")
+    want = f"taza-{sw_hash([a for a in assets if (ROOT / a).is_file() or a == './'])}"
+    cur = re.search(r"const VERSION = '([^']+)'", sw)
+    if not cur or cur.group(1) != want:
+        if fix:
+            (ROOT / "sw.js").write_text(re.sub(r"const VERSION = '[^']+'", f"const VERSION = '{want}'", sw))
+            print(f"sw.js: VERSION -> {want}")
+        else:
+            err(f"sw.js: VERSION should be '{want}' (cached files changed) - run python3 scripts/check.py --fix-sw")
+    if "/api/" not in sw:
+        err("sw.js: must bypass /api/ requests")
     # every runtime module and data file the app loads must be cached for offline use
     must = [str(p.relative_to(ROOT)) for p in (ROOT / "js").glob("*.js")] + \
         ["data/forecast_model.json", "data/snapshot.json", "data/sensors_snapshot.json", "data/demo_winter.json", "index.html", "styles.css"]
@@ -177,7 +198,7 @@ def main():
     check_raw("data/demo_winter.json", min_hours=72)
     check_sensors("data/sensors_snapshot.json")
     check_api()
-    check_sw()
+    check_sw(fix="--fix-sw" in sys.argv)
     check_links()
     check_external_urls()
     if errors:

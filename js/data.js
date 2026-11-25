@@ -12,9 +12,9 @@ const TIMEOUT_MS = 9000;
 const FC_FRESH_MS = 3 * 3600 * 1000;
 const SN_FRESH_MS = 10 * 60 * 1000;
 
-async function fetchJson(url) {
+async function fetchJson(url, timeoutMs = TIMEOUT_MS) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const r = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -42,8 +42,10 @@ export function validRaw(raw) {
 }
 
 export function validSensors(s) {
-  return !!s && Array.isArray(s.sensors) && typeof s.fetchedAt === 'string'
-    && s.sensors.every((x) => typeof x.lat === 'number' && typeof x.lon === 'number');
+  if (!s || !Array.isArray(s.sensors) || typeof s.fetchedAt !== 'string') return false;
+  // an empty answer because the sources were down must not overwrite a good cache
+  if (!s.liveCount && s.errors && s.errors.length) return false;
+  return s.sensors.every((x) => typeof x.lat === 'number' && typeof x.lon === 'number');
 }
 
 export function localStamp(ms, offsetSec) {
@@ -76,8 +78,17 @@ export async function loadForecast({ preferCache = true } = {}) {
   return { raw: r.data, source: r.source, error: r.error };
 }
 
+export const SENSORS_TIMEOUT_MS = 18000; // a cold serverless start can take ~9 s
+
+// Instant first paint: cached sensors (any age) or the bundled snapshot; refresh separately.
+export async function initialSensors() {
+  const cached = cacheGet(SN_KEY, validSensors);
+  if (cached) return { sensors: cached, source: 'cache' };
+  return { sensors: await (await fetch('data/sensors_snapshot.json')).json(), source: 'snapshot' };
+}
+
 export async function loadSensors({ preferCache = true } = {}) {
-  const r = await chain(SENSORS_URL, SN_KEY, SN_FRESH_MS, validSensors, fetchJson, 'data/sensors_snapshot.json', preferCache);
+  const r = await chain(SENSORS_URL, SN_KEY, SN_FRESH_MS, validSensors, (u) => fetchJson(u, SENSORS_TIMEOUT_MS), 'data/sensors_snapshot.json', preferCache);
   return { sensors: r.data, source: r.data.snapshot && r.source === 'live' ? 'snapshot' : r.source, error: r.error };
 }
 
