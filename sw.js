@@ -1,7 +1,7 @@
 // Service worker: versioned cache for the app shell and local data, network for Open-Meteo
 // (the app itself keeps the last forecast in localStorage).
 // VERSION = hash of the cached files; scripts/check.py verifies it, `--fix-sw` rewrites it.
-const VERSION = 'taza-bdd5c6ea08';
+const VERSION = 'taza-b930e26e69';
 const ASSETS = [
   './',
   'index.html',
@@ -15,6 +15,7 @@ const ASSETS = [
   'data/forecast_model.json',
   'data/sensors_snapshot.json',
   'data/small_sample.json',
+  'data/almaty_districts.json',
   'data/snapshot.json',
   'data/demo_winter.json',
   'icons/icon.svg',

@@ -124,7 +124,11 @@ def main():
             "n": int(len(y)),
             "mae": {"model": float(np.abs(p - y).mean()), "persistence": float(np.abs(n - y).mean()), "cams": float(np.abs(c - y).mean())},
             "cat_acc": {"model": float((cat(p) == cat(y)).mean()), "persistence": float((cat(n) == cat(y)).mean()), "cams": float((cat(c) == cat(y)).mean())},
-            "decision": {"model": dec(p, model["decision_threshold"]), "persistence": dec(n), "cams": dec(c)},
+            "decision": {"model": dec(p, model["decision_threshold"]), "persistence": dec(n), "cams": dec(c),
+                         "max_model_now": dec(np.maximum(p, n))},
+            "mae_max_model_now": float(np.abs(np.maximum(p, n) - y).mean()),
+            "mae_peaks_max_model_now": float(np.abs(np.maximum(p, n) - y)[y > 100].mean()),
+            "indoor_share": {"model": float((p > OUTDOOR_LIMIT).mean()), "max_model_now": float((np.maximum(p, n) > OUTDOOR_LIMIT).mean())},
             "bad_share": float((y > OUTDOOR_LIMIT).mean()),
             "mae_peaks": {"model": float(np.abs(p - y)[y > 100].mean()), "persistence": float(np.abs(n - y)[y > 100].mean()), "cams": float(np.abs(c - y)[y > 100].mean())},
         }
@@ -145,6 +149,9 @@ def main():
         "decision_acc": {**{k: round(v[0], 3) for k, v in overall["decision"].items()}, "always_outdoor": round(1 - overall["bad_share"], 3)},
         "decision_recall_bad": {k: round(v[2], 3) for k, v in overall["decision"].items()},
         "decision_precision_bad": {k: round(v[1], 3) for k, v in overall["decision"].items()},
+        "school_rule": "max_model_now",
+        "max_model_now": {"mae": round(overall["mae_max_model_now"], 1), "mae_peaks": round(overall["mae_peaks_max_model_now"], 1),
+                          "indoor_share": round(overall["indoor_share"]["max_model_now"], 3), "indoor_share_model": round(overall["indoor_share"]["model"], 3)},
         "mae_peaks_over_100": {k: round(v, 1) for k, v in overall["mae_peaks"].items()},
         "median_ratio_ground_to_cams": round(ratio, 2),
         "peaks_over_100": {k: round(v, 1) for k, v in peak.items()},
@@ -216,7 +223,10 @@ def write_report(model, buckets, overall, h, per_h, ratio, peak):
     for k, nm in names.items():
         a, p, r = overall["decision"][k]
         L.append(f"| {nm} | {f(100 * a, 0)}% | {f(100 * p, 0)}% | {f(100 * r, 0)}% | {f(100 * overall['cat_acc'][k], 0)}% |")
+    a, p_, r = overall["decision"]["max_model_now"]
+    L.append(f"| **Консервативно: max(модель, датчик сейчас)** | {f(100 * a, 0)}% | {f(100 * p_, 0)}% | **{f(100 * r, 0)}%** | — |")
     L.append(f"| Правило «всегда на улице» | {f(100 * (1 - overall['bad_share']), 0)}% | — | 0% | — |")
+    L += ["", f"**Для школы выбрано консервативное правило** max(прогноз модели, текущее значение датчика): оно ловит {f(100 * r, 0)}% грязных часов против {f(100 * overall['decision']['model'][2], 0)}% у модели, ценой точности ({f(100 * a, 0)}% против {f(100 * overall['decision']['model'][0], 0)}%) и большего числа уроков в зале ({f(100 * overall['indoor_share']['max_model_now'], 0)}% часов против {f(100 * overall['indoor_share']['model'], 0)}%). Ошибка в сильный смог (факт > 100): {f(overall['mae_peaks_max_model_now'])} против {f(overall['mae_peaks']['model'])} у модели и {f(overall['mae_peaks']['persistence'])} у persistence. Для детей пропустить грязный урок хуже, чем лишний раз уйти в зал. Лента прогноза на экране по-прежнему показывает саму модель (у неё меньше средняя ошибка: {f(overall['mae']['model'])} против {f(overall['mae_max_model_now'])})."]
     L += ["", "Точность решения обманчива: правило «всегда на улице» уже даёт столько, сколько чистых часов. Главное — recall «плохо»: какую долю грязных часов прогноз поймал и отправил детей в зал."]
     L += [
         "",

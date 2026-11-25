@@ -55,7 +55,7 @@ def test_school_rules():
         for l in lessons:
             assert l["v"] in ("yes", "light", "no", None)
             if l["v"] == "no":
-                assert l["pm"] > 55.4
+                assert l["pm"] > 55.4  # (harness passes the model forecast; the app applies max(forecast, sensor now) on top)
             if l["v"] == "yes":
                 assert l["pm"] <= 35.4
 

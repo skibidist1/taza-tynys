@@ -785,17 +785,27 @@
    "model": 0.749,
    "persistence": 0.702,
    "cams": 0.672,
+   "max_model_now": 0.703,
    "always_outdoor": 0.627
   },
   "decision_recall_bad": {
    "model": 0.717,
    "persistence": 0.602,
-   "cams": 0.396
+   "cams": 0.396,
+   "max_model_now": 0.871
   },
   "decision_precision_bad": {
    "model": 0.648,
    "persistence": 0.6,
-   "cams": 0.59
+   "cams": 0.59,
+   "max_model_now": 0.567
+  },
+  "school_rule": "max_model_now",
+  "max_model_now": {
+   "mae": 21.8,
+   "mae_peaks": 41.8,
+   "indoor_share": 0.574,
+   "indoor_share_model": 0.413
   },
   "mae_peaks_over_100": {
    "model": 60.6,

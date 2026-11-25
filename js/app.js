@@ -42,6 +42,9 @@ const pointLabel = () => (state.point.name || (state.point.key ? t(state.point.k
 const shown = (pm) => (pm < 100 ? Math.round(pm * 10) / 10 : Math.round(pm)); // value as displayed
 const fmtPm = (pm) => num(shown(pm), pm < 100 ? 1 : 0);
 const catName = (pm, l) => (l ? tl(l, `cat_${CAT_KEYS[catOf(shown(pm))]}`) : t(`cat_${CAT_KEYS[catOf(shown(pm))]}`));
+// School decisions use the conservative rule max(forecast, sensor now): it catches 87% of dirty hours
+// instead of 72% on the test period (evals/forecast_report.md). The forecast strip still shows the model.
+const schoolHours = () => state.data.hours.map((h) => (h.fc == null ? h : { ...h, fc: Math.max(h.fc, state.pmNow) }));
 const when = (time) => `${dayName(time.slice(0, 10)).toLowerCase()} ${hhmm(time)}`;
 // end of an episode = start of the hour after its last hour (the day can change at midnight)
 function endOf(run) {
@@ -79,6 +82,15 @@ function renderStatus() {
 }
 
 // ---------- map ----------
+// District boundaries from OSM (pipeline/make_districts.py), drawn as a light underlay.
+function districtPaths() {
+  if (!state.districts) return '';
+  return state.districts.districts.map((d) => d.rings.map((r) => `<path class="district" d="${r.map(([la, lo], i) => {
+    const [x, y] = proj(la, lo);
+    return `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join('')}Z"/>`).join('')).join('');
+}
+
 function proj(lat, lon) {
   return [((lon - BBOX.w) / (BBOX.e - BBOX.w)) * MAP_W, ((BBOX.n - lat) / (BBOX.n - BBOX.s)) * MAP_H];
 }
@@ -97,7 +109,10 @@ function renderPlace() {
   const labels = PLACES.map((p) => { const [x, y] = proj(p.lat, p.lon); return `<text x="${x}" y="${y}" class="dlabel">${esc(t(p.key))}</text>`; }).join('');
   $('#place').innerHTML = `<div class="card-head"><h2>${esc(t('place_title'))}</h2><p class="hint">${esc(t('place_hint'))}</p></div>
     <svg class="map" id="map" viewBox="0 0 ${MAP_W} ${MAP_H}" role="img" aria-label="${esc(t('place_title'))}">
+      <defs><clipPath id="mapclip"><rect x="0" y="0" width="${MAP_W}" height="${MAP_H}" rx="18"/></clipPath></defs>
       <rect x="0" y="0" width="${MAP_W}" height="${MAP_H}" rx="18" class="mapbg"/>
+      <g clip-path="url(#mapclip)">${districtPaths()}</g>
+      <text x="${MAP_W - 8}" y="${MAP_H - 8}" class="osm">© OpenStreetMap</text>
       ${labels}${line}${dots}
       <g transform="translate(${px},${py})" class="pin"><circle r="9"/><circle r="3" class="pin-c"/></g>
     </svg>
@@ -171,7 +186,7 @@ function demoEval() {
   let n = 0;
   for (const d of days) {
     const actualHours = hours.map((h) => ({ ...h, fc: act[h.time] ?? null }));
-    const f = schoolDay(hours, d, DEFAULT_BELLS[1], [], 35.4, d === day ? hours[nowIndex].time.slice(0, 16) : null).lessons;
+    const f = schoolDay(schoolHours(), d, DEFAULT_BELLS[1], [], 35.4, d === day ? hours[nowIndex].time.slice(0, 16) : null).lessons;
     const a = schoolDay(actualHours, d, DEFAULT_BELLS[1], [], 35.4, d === day ? hours[nowIndex].time.slice(0, 16) : null).lessons;
     f.forEach((l, i) => { if (l.verdict && a[i].verdict) { n++; if ((l.verdict === 'no') === (a[i].verdict === 'no')) ok++; } });
   }
@@ -365,7 +380,7 @@ function announcement(sd, lang) {
       if (bad && bad.from.slice(0, 10) === sd.day) lines.push(tl(lang, 'ann_bad', { from: hhmm(bad.from), limit: num(35.4, 1) }));
     }
   }
-  lines.push(tl(lang, 'ann_src'));
+  lines.push(tl(lang, state.mode === 'archive' ? 'ann_src_archive' : 'ann_src'));
   return lines.join('\n');
 }
 
@@ -397,11 +412,11 @@ function renderSchool() {
   const days = state.pmNow == null ? [] : schoolDays(state.data.hours, state.data.nowIndex, bells);
   if (!days.includes(state.schoolDay)) {
     // default: today, unless all of today's PE lessons are already over
-    const today = schoolDay(state.data.hours, days[0] || '', bells, pe, thr, nowTime);
+    const today = schoolDay(schoolHours(), days[0] || '', bells, pe, thr, nowTime);
     const todayDone = pe.length && today.lessons.filter((l) => l.pe).every((l) => l.reason === 'r_past');
     state.schoolDay = (todayDone && days[1]) || days[0] || null;
   }
-  const sd = state.schoolDay ? schoolDay(state.data.hours, state.schoolDay, bells, pe, thr, nowTime) : null;
+  const sd = state.schoolDay ? schoolDay(schoolHours(), state.schoolDay, bells, pe, thr, nowTime) : null;
   const chip = (attr, val, cur, label) => `<button class="chip" role="radio" ${attr}="${val}" aria-checked="${val === cur}">${esc(label)}</button>`;
   const row = (l) => {
     const res = l.pe && l.verdict
@@ -494,6 +509,11 @@ function renderHonest() {
       <tbody>${Object.entries(m.buckets).map(([b, v]) => `<tr><td>${esc(b)}</td><td><b>${f1(v.model)}</b></td><td>${f1(v.persistence)}</td><td>${f1(v.cams)}</td></tr>`).join('')}
       <tr><td><b>1–48</b></td><td><b>${f1(m.mae_model)}</b></td><td>${f1(m.mae_persistence)}</td><td>${f1(m.mae_cams)}</td></tr></tbody></table>
       <p class="small" style="margin-top:10px"><b>${esc(t('h_peaks', { m: f1(m.mae_peaks_over_100.model), p: f1(m.mae_peaks_over_100.persistence), c: f1(m.mae_peaks_over_100.cams) }))}</b></p>
+      <h2 style="margin-top:14px">${esc(t('h_rule_title'))}</h2>
+      <table class="tbl"><thead><tr><th>${esc(t('h_col_rule'))}</th><th>${esc(t('h_col_acc'))}</th><th>${esc(t('h_col_recall'))}</th></tr></thead><tbody>
+      ${[['model', 'h_col_model'], ['persistence', 'h_col_pers'], ['cams', 'h_col_cams'], ['max_model_now', 'h_rule_max']].map(([k, lbl]) => `<tr${k === 'max_model_now' ? ' class="hl"' : ''}><td>${esc(t(lbl))}</td><td>${num(m.decision_acc[k] * 100)}%</td><td><b>${num(m.decision_recall_bad[k] * 100)}%</b></td></tr>`).join('')}
+      <tr><td>${esc(t('h_rule_always'))}</td><td>${num(m.decision_acc.always_outdoor * 100)}%</td><td>0%</td></tr></tbody></table>
+      <p class="small" style="margin-top:8px">${esc(t('h_rule_note', { r: num(m.decision_recall_bad.max_model_now * 100), rm: num(m.decision_recall_bad.model * 100), share: num(m.max_model_now.indoor_share * 100), sharem: num(m.max_model_now.indoor_share_model * 100), mp: f1(m.max_model_now.mae_peaks) }))}</p>
       <p class="small" style="margin-top:10px">${esc(t('h_dec', {
         m: num(m.decision_acc.model * 100), p: num(m.decision_acc.persistence * 100), c: num(m.decision_acc.cams * 100), a: num(m.decision_acc.always_outdoor * 100),
         rm: num(m.decision_recall_bad.model * 100), rp: num(m.decision_recall_bad.persistence * 100), rc: num(m.decision_recall_bad.cams * 100),
@@ -508,6 +528,8 @@ function renderHonest() {
 
 // ---------- tabs, compute, boot ----------
 const TABS = ['today', 'why', 'school', 'honest'];
+const TAB_ALIAS = { honesty: 'honest', now: 'today', schools: 'school' };
+const tabFromHash = () => { const n = decodeURIComponent(location.hash.slice(1)); return TAB_ALIAS[n] || n; };
 function showTab(name) {
   state.tab = name;
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
@@ -539,6 +561,7 @@ async function boot(mode = 'live', preferCache = true) {
   if (!state.model) {
     state.model = await fetch('data/forecast_model.json').then((r) => r.json());
     state.small = await fetch('data/small_sample.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    state.districts = await fetch('data/almaty_districts.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
   }
   state.mode = mode;
   if (mode === 'archive') {
@@ -572,10 +595,10 @@ async function refreshSensors(preferCache) {
 }
 
 document.querySelectorAll('.tabs button').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
-window.addEventListener('hashchange', () => { const n = location.hash.slice(1); if (TABS.includes(n) && n !== state.tab) showTab(n); });
+window.addEventListener('hashchange', () => { const n = tabFromHash(); if (TABS.includes(n) && n !== state.tab) showTab(n); });
 $('#lang').onclick = () => { setLang(getLang() === 'kk' ? 'ru' : 'kk'); renderAll(); };
 applyStatic();
-if (TABS.includes(location.hash.slice(1))) showTab(location.hash.slice(1));
+if (TABS.includes(tabFromHash())) showTab(tabFromHash());
 boot(new URLSearchParams(location.search).get('demo') === 'winter' ? 'archive' : 'live').catch((e) => {
   $('#hero').innerHTML = `<p class="loading">${esc(t('load_error'))}: ${esc(e.message || e)}</p>`;
 });

@@ -481,3 +481,9 @@ details summary { cursor: pointer; color: var(--ink2); font-size: 0.9rem; }
 .demo-eval { margin-top: 8px; font-size: 0.88rem; color: var(--ink2); border-left: 3px solid var(--lvl3); padding-left: 10px; }
 .value.small-v { font-size: 1.6rem; letter-spacing: 0; }
 @media (max-width: 380px) { .tabs { gap: 0; } .tabs button { padding: 8px 9px; font-size: 0.88rem; } }
+
+.tbl tr.hl td { background: color-mix(in srgb, var(--lvl0) 25%, transparent); }
+.district { fill: color-mix(in srgb, var(--accent) 6%, transparent); stroke: var(--ink3); stroke-width: 0.8; stroke-opacity: 0.5; }
+.osm { font-size: 9px; fill: var(--ink3); text-anchor: end; }
+.profiles { flex-wrap: wrap; overflow-x: visible; }
+.profiles .chip { max-width: 100%; white-space: normal; text-align: left; }
