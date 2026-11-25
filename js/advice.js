@@ -153,7 +153,8 @@ export function lessonVerdict(hours, day, from, to, lightFrom, nowTime = null) {
   const pm = Math.max(...hs.map((h) => h.fc));
   const cat = catOf(pm);
   const temp = Math.min(...hs.map((h) => h.temp));
-  const base = { pm, cat, temp };
+  // what drove the worst hour: the sensor reading now (nearest hours) or the model forecast
+  const base = { pm, cat, temp, src: hs.find((h) => h.fc === pm)?.src === 'sensor' ? 'sensor' : 'forecast' };
   if (pm > 55.4) return { ...base, verdict: 'no', reason: 'r_unhealthy' };
   if (pm > lightFrom) return { ...base, verdict: 'light', reason: 'r_usg' };
   return { ...base, verdict: 'yes', reason: 'r_ok' };

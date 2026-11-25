@@ -39,3 +39,10 @@ def predict(model, h, x):
         contrib.append(v)
         z += v
     return max(math.exp(z) * m.get("smear", 1.0) - 1.0, 0.0), contrib
+
+
+def interval(model, h, x):
+    """Median and 80% interval (residual quantiles on train), ug/m3."""
+    m = model["horizons"][h - 1]
+    z = m["intercept"] + sum(c * (xi - mu) / sd for xi, mu, sd, c in zip(x, model["mean"], model["std"], m["coef"]))
+    return max(math.expm1(z), 0.0), max(math.expm1(z + m["q10"]), 0.0), max(math.expm1(z + m["q90"]), 0.0)

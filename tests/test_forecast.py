@@ -31,8 +31,10 @@ def test_contract():
     for k, hz in enumerate(m["horizons"], 1):
         assert hz["h"] == k and len(hz["coef"]) == len(FEATURES) and math.isfinite(hz["intercept"])
     assert all(s > 0 for s in m["std"])
-    for k in ("mae_model", "mae_persistence", "mae_cams"):
-        assert m["metrics"][k] > 0
+    for k in ("model", "persistence", "cams", "max_pers_cams"):
+        assert m["metrics"]["mae"][k] > 0
+    assert 0.6 < m["metrics"]["interval80_coverage"] < 0.98
+    assert all(hz["q10"] < 0 < hz["q90"] for hz in m["horizons"])
 
 
 def test_python_cases():
@@ -53,6 +55,9 @@ def test_js_matches_python():
     for a, c in zip(js, load("tests/forecast_cases.json")):
         assert all(close(u, v) for u, v in zip(a["x"], c["x"])), (a["x"], c["x"])
         assert close(a["pm"], c["p"]), (a["pm"], c["p"])
+        for k in ("median", "lo", "hi"):
+            assert close(a[k], c[k]), (k, a[k], c[k])
+        assert a["lo"] <= a["median"] <= a["hi"]
         assert all(close(u, v) for u, v in zip(a["contrib"], c["contrib"]))
 
 

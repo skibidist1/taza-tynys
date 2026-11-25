@@ -63,9 +63,12 @@ def check_model():
     for k, h in enumerate(hz, 1):
         if h.get("h") != k or len(h.get("coef", [])) != n or not finite(h.get("intercept")) or not (0.5 < h.get("smear", 0) < 3):
             err(f"forecast_model.json: bad horizon {k}")
-    for k in ("mae_model", "mae_persistence", "mae_cams"):
-        if not (finite(m.get("metrics", {}).get(k)) and m["metrics"][k] > 0):
-            err(f"forecast_model.json: metrics.{k} missing")
+    for k in ("model", "persistence", "cams"):
+        if not (finite(m.get("metrics", {}).get("mae", {}).get(k)) and m["metrics"]["mae"][k] > 0):
+            err(f"forecast_model.json: metrics.mae.{k} missing")
+    for k in ("q10", "q90"):
+        if any(not finite(hz.get(k)) for hz in hz):
+            err(f"forecast_model.json: horizons lack {k}")
 
 
 def check_sensors(rel):

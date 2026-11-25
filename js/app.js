@@ -42,9 +42,11 @@ const pointLabel = () => (state.point.name || (state.point.key ? t(state.point.k
 const shown = (pm) => (pm < 100 ? Math.round(pm * 10) / 10 : Math.round(pm)); // value as displayed
 const fmtPm = (pm) => num(shown(pm), pm < 100 ? 1 : 0);
 const catName = (pm, l) => (l ? tl(l, `cat_${CAT_KEYS[catOf(shown(pm))]}`) : t(`cat_${CAT_KEYS[catOf(shown(pm))]}`));
-// School decisions use the conservative rule max(forecast, sensor now): it catches 87% of dirty hours
-// instead of 72% on the test period (evals/forecast_report.md). The forecast strip still shows the model.
-const schoolHours = () => state.data.hours.map((h) => (h.fc == null ? h : { ...h, fc: Math.max(h.fc, state.pmNow) }));
+// School decisions: for the nearest N hours (lesson in progress or about to start) the larger of the forecast
+// and the sensor reading now; later lessons use the model forecast only. N is picked on training data
+// (data/forecast_model.json: school_rule_hours, see evals/forecast_report.md). The forecast strip shows the model.
+const sensorHours = () => state.model.school_rule_hours ?? 3;
+const schoolHours = () => state.data.hours.map((h) => (h.fc == null || h.h == null || h.h > sensorHours() || state.pmNow <= h.fc ? h : { ...h, fc: state.pmNow, src: 'sensor' }));
 const when = (time) => `${dayName(time.slice(0, 10)).toLowerCase()} ${hhmm(time)}`;
 // end of an episode = start of the hour after its last hour (the day can change at midnight)
 function endOf(run) {
@@ -358,19 +360,21 @@ function schoolCfg() {
     shift: c.shift === 2 ? 2 : 1,
     bells: { 1: c.bells?.[1] || DEFAULT_BELLS[1], 2: c.bells?.[2] || DEFAULT_BELLS[2] },
     pe: { 1: c.pe?.[1] || DEFAULT_PE[1], 2: c.pe?.[2] || DEFAULT_PE[2] },
+    school: String(c.school || '').slice(0, 60), cls: String(c.cls || '').slice(0, 10), sign: String(c.sign || '').slice(0, 80),
   };
 }
 
 function announcement(sd, lang) {
-  const lines = [tl(lang, 'ann_head'), tl(lang, 'ann_intro', { date: dateLong(sd.day, lang) })];
+  const c = schoolCfg();
+  const who = [c.school && tl(lang, 'ann_school', { school: c.school }), c.cls && tl(lang, 'ann_class', { cls: c.cls })].filter(Boolean).join(' ');
+  const lines = [tl(lang, 'ann_head'), ...(who ? [who] : []), tl(lang, 'ann_intro', { date: dateLong(sd.day, lang) })];
   const pe = sd.lessons.filter((l) => l.pe && l.verdict);
   if (!pe.length) lines.push(tl(lang, 'ann_none'));
   for (const l of pe) {
-    lines.push(`• ${tl(lang, 'ann_item', {
-      n: l.n, from: l.from, to: l.to, verdict: tl(lang, `v_${l.verdict}`),
-      reason: tl(lang, l.reason, { pm: fmtPm(l.pm), cat: catName(l.pm, lang) }),
-    })}`);
+    lines.push(`• ${tl(lang, 'ann_item', { n: l.n, from: l.from, to: l.to, verdict: tl(lang, `ann_v_${l.verdict}`), pm: fmtPm(l.pm) })}`);
   }
+  if (pe.some((l) => l.verdict === 'light')) lines.push(tl(lang, 'ann_sens'));
+  if (pe.length) lines.push(tl(lang, pe.some((l) => l.verdict === 'no') ? 'ann_do_no' : 'ann_do_out'));
   const last = sd.lessons[sd.lessons.length - 1];
   if (last) {
     const endH = Number(last.to.slice(0, 2)) + (Number(last.to.slice(3, 5)) > 0 ? 1 : 0);
@@ -381,7 +385,15 @@ function announcement(sd, lang) {
     }
   }
   lines.push(tl(lang, state.mode === 'archive' ? 'ann_src_archive' : 'ann_src'));
+  if (c.sign) lines.push(tl(lang, 'ann_sign', { sign: c.sign }));
   return lines.join('\n');
+}
+
+async function shareText(text, btn, label) {
+  if (navigator.share) {
+    try { await navigator.share({ text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  return copyText(text, btn, label);
 }
 
 async function copyText(text, btn, label) {
@@ -420,7 +432,7 @@ function renderSchool() {
   const chip = (attr, val, cur, label) => `<button class="chip" role="radio" ${attr}="${val}" aria-checked="${val === cur}">${esc(label)}</button>`;
   const row = (l) => {
     const res = l.pe && l.verdict
-      ? `<span class="v">${esc(t(`v_${l.verdict}`))}</span><span class="why2">${esc(t(l.reason, { pm: fmtPm(l.pm), cat: catName(l.pm) }))}</span>`
+      ? `<span class="v">${esc(t(`v_${l.verdict}`))}</span><span class="why2">${esc(t(l.reason, { pm: fmtPm(l.pm), cat: catName(l.pm) }))} · ${esc(t(l.src === 'sensor' ? 'src_sensor' : 'src_forecast'))}</span>`
       : `<span class="pm">${l.verdict ? `PM2.5 ${fmtPm(l.pm)} · ${num(l.temp)}°` : esc(t(l.reason))}</span>`;
     return `<li class="${l.pe && l.verdict ? `v-${l.verdict}` : 'plain'}">
       <span class="ln">${esc(t('lesson', { n: l.n }))}<span class="tm">${l.from}–${l.to}</span></span>
@@ -443,10 +455,16 @@ function renderSchool() {
       </details>
     </article>
     ${sd ? `<article class="card"><h2>${esc(t('ann_title'))}</h2>
-      <div class="ann">${esc(announcement(sd, 'ru'))}</div><button class="btn" id="copy-ru" type="button">${esc(t('copy_ru'))}</button>
-      <div class="ann">${esc(announcement(sd, 'kk'))}</div><button class="btn" id="copy-kk" type="button">${esc(t('copy_kk'))}</button>
+      <details class="bells"${cfg.school || cfg.cls || cfg.sign ? ' open' : ''}><summary>${esc(t('ann_sets'))}</summary>
+        <div class="bell-list">
+          <input type="text" data-f="school" maxlength="60" placeholder="${esc(t('ann_f_school'))}" value="${esc(cfg.school)}">
+          <input type="text" data-f="cls" maxlength="10" placeholder="${esc(t('ann_f_class'))}" value="${esc(cfg.cls)}">
+          <input type="text" data-f="sign" maxlength="80" placeholder="${esc(t('ann_f_sign'))}" value="${esc(cfg.sign)}">
+        </div></details>
+      <div class="ann">${esc(announcement(sd, 'ru'))}</div><div class="days"><button class="btn" id="copy-ru" type="button">${esc(t('copy_ru'))}</button><button class="btn" id="share-ru" type="button">${esc(t('share_ru'))}</button></div>
+      <div class="ann">${esc(announcement(sd, 'kk'))}</div><div class="days"><button class="btn" id="copy-kk" type="button">${esc(t('copy_kk'))}</button><button class="btn" id="share-kk" type="button">${esc(t('share_kk'))}</button></div>
     </article>` : ''}
-    <article class="card"><p class="small">${esc(t('school_method', { thr: num(thr, 1) }))}</p><p class="ref">${esc(t('refs'))}</p></article>`;
+    <article class="card"><p class="small">${esc(t('school_method', { thr: num(thr, 1), n: sensorHours() }))}</p><p class="ref">${esc(t('refs'))}</p></article>`;
 
   el.querySelectorAll('[data-shift]').forEach((b) => { b.onclick = () => { cfg.shift = Number(b.dataset.shift); state.schoolDay = null; save(); }; });
   el.querySelectorAll('[data-d]').forEach((b) => { b.onclick = () => { state.schoolDay = b.dataset.d; renderSchool(); }; });
@@ -457,6 +475,9 @@ function renderSchool() {
       cfg.pe[cfg.shift] = [...set].sort((a, b) => a - b);
       save();
     };
+  });
+  el.querySelectorAll('[data-f]').forEach((inp) => {
+    inp.onchange = () => { cfg[inp.dataset.f] = inp.value.trim(); store.set('school2', cfg); renderSchool(); };
   });
   const keepOpen = () => { const d = el.querySelector('details.bells'); if (d) d.open = true; };
   el.querySelectorAll('[data-bell]').forEach((inp) => {
@@ -490,6 +511,8 @@ function renderSchool() {
   if (sd) {
     $('#copy-ru').onclick = () => copyText(announcement(sd, 'ru'), $('#copy-ru'), t('copy_ru'));
     $('#copy-kk').onclick = () => copyText(announcement(sd, 'kk'), $('#copy-kk'), t('copy_kk'));
+    $('#share-ru').onclick = () => shareText(announcement(sd, 'ru'), $('#share-ru'), t('share_ru'));
+    $('#share-kk').onclick = () => shareText(announcement(sd, 'kk'), $('#share-kk'), t('share_kk'));
   }
 }
 
@@ -498,6 +521,9 @@ function renderHonest() {
   const m = state.model.metrics;
   const f1 = (v) => num(v, 1);
   const pk = m.peaks_over_100;
+  const dec = m.school_hours.decisions;
+  const pc = (v) => num(v * 100);
+  const rules = [['model', t('h_col_model')], ['with_now', t('h_rule_school', { n: m.school_rule_hours })], ['persistence', t('h_col_pers')], ['cams', t('h_col_cams')]];
   const small = state.small?.results || [];
   const okSensors = state.snLoad.sensors.sensors.filter((s) => s.ok);
   $('#view-honest').innerHTML = `
@@ -507,17 +533,18 @@ function renderHonest() {
     <article class="card"><h2>${esc(t('h_fc_title'))}</h2><p class="hint">${esc(t('h_fc_hint', { test: t('test_period') }))}</p>
       <table class="tbl"><thead><tr><th>${esc(t('h_col_h'))}</th><th>${esc(t('h_col_model'))}</th><th>${esc(t('h_col_pers'))}</th><th>${esc(t('h_col_cams'))}</th></tr></thead>
       <tbody>${Object.entries(m.buckets).map(([b, v]) => `<tr><td>${esc(b)}</td><td><b>${f1(v.model)}</b></td><td>${f1(v.persistence)}</td><td>${f1(v.cams)}</td></tr>`).join('')}
-      <tr><td><b>1–48</b></td><td><b>${f1(m.mae_model)}</b></td><td>${f1(m.mae_persistence)}</td><td>${f1(m.mae_cams)}</td></tr></tbody></table>
-      <p class="small" style="margin-top:10px"><b>${esc(t('h_peaks', { m: f1(m.mae_peaks_over_100.model), p: f1(m.mae_peaks_over_100.persistence), c: f1(m.mae_peaks_over_100.cams) }))}</b></p>
+      <tr><td><b>1–48</b></td><td><b>${f1(m.mae.model)}</b></td><td>${f1(m.mae.persistence)}</td><td>${f1(m.mae.cams)}</td></tr></tbody></table>
+      <p class="small" style="margin-top:10px"><b>${esc(t('h_peaks', { m: f1(m.mae_peaks.model), p: f1(m.mae_peaks.persistence), c: f1(m.mae_peaks.cams) }))}</b></p>
       <h2 style="margin-top:14px">${esc(t('h_rule_title'))}</h2>
-      <table class="tbl"><thead><tr><th>${esc(t('h_col_rule'))}</th><th>${esc(t('h_col_acc'))}</th><th>${esc(t('h_col_recall'))}</th></tr></thead><tbody>
-      ${[['model', 'h_col_model'], ['persistence', 'h_col_pers'], ['cams', 'h_col_cams'], ['max_model_now', 'h_rule_max']].map(([k, lbl]) => `<tr${k === 'max_model_now' ? ' class="hl"' : ''}><td>${esc(t(lbl))}</td><td>${num(m.decision_acc[k] * 100)}%</td><td><b>${num(m.decision_recall_bad[k] * 100)}%</b></td></tr>`).join('')}
-      <tr><td>${esc(t('h_rule_always'))}</td><td>${num(m.decision_acc.always_outdoor * 100)}%</td><td>0%</td></tr></tbody></table>
-      <p class="small" style="margin-top:8px">${esc(t('h_rule_note', { r: num(m.decision_recall_bad.max_model_now * 100), rm: num(m.decision_recall_bad.model * 100), share: num(m.max_model_now.indoor_share * 100), sharem: num(m.max_model_now.indoor_share_model * 100), mp: f1(m.max_model_now.mae_peaks) }))}</p>
-      <p class="small" style="margin-top:10px">${esc(t('h_dec', {
-        m: num(m.decision_acc.model * 100), p: num(m.decision_acc.persistence * 100), c: num(m.decision_acc.cams * 100), a: num(m.decision_acc.always_outdoor * 100),
-        rm: num(m.decision_recall_bad.model * 100), rp: num(m.decision_recall_bad.persistence * 100), rc: num(m.decision_recall_bad.cams * 100),
-      }))}</p></article>
+      <p class="small">${esc(t('h_dec'))}</p>
+      <table class="tbl"><thead><tr><th>${esc(t('h_col_rule'))}</th><th>${esc(t('h_col_share'))}</th><th>${esc(t('h_col_recall'))}</th></tr></thead><tbody>
+      ${rules.map(([k, lbl]) => { const d = dec[k]; return `<tr${k === 'with_now' ? ' class="hl"' : ''}><td>${esc(lbl)}</td><td>${pc(d.indoor_share)}%</td><td><b>${pc(d.recall)}%</b> <span class="small">(${pc(d.recall_ci[0])}–${pc(d.recall_ci[1])})</span></td></tr>`; }).join('')}
+      <tr><td>${esc(t('h_rule_always'))}</td><td>0%</td><td>0%</td></tr></tbody></table>
+      <p class="small" style="margin-top:8px">${esc(t('h_rule_note', { n: m.school_rule_hours }))}</p>
+      <h2 style="margin-top:14px">${esc(t('h_equal_title'))}</h2>
+      <table class="tbl"><thead><tr><th>${esc(t('h_col_rule'))}</th><th>${esc(t('h_equal_30'))}</th><th>${esc(t('h_equal_40'))}</th><th>${esc(t('h_equal_50'))}</th></tr></thead><tbody>
+      ${rules.map(([k, lbl]) => `<tr${k === 'with_now' ? ' class="hl"' : ''}><td>${esc(lbl)}</td>${['30', '40', '50'].map((q) => `<td><b>${pc(dec[k].recall_at_share[q])}%</b></td>`).join('')}</tr>`).join('')}</tbody></table>
+      <p class="small" style="margin-top:8px">${esc(t('h_equal_note'))}</p></article>
     <article class="card"><h2>${esc(t('h_small_title'))}</h2><p class="hint">${esc(t('h_small_hint'))}</p>
       ${small.length ? `<table class="tbl"><thead><tr><th>${esc(t('h_col_sensor'))}</th><th>${esc(t('h_col_model'))}</th><th>${esc(t('h_col_pers'))}</th><th>${esc(t('h_col_cams'))}</th></tr></thead>
       <tbody>${small.map((r) => `<tr><td>${esc(r.sensor)}</td><td><b>${f1(r.mae.model)}</b></td><td>${f1(r.mae.persistence)}</td><td>${f1(r.mae.cams)}</td></tr>`).join('')}</tbody></table>` : '<p>—</p>'}</article>

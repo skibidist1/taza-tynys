@@ -25,5 +25,12 @@ export function predict(model, h, x) {
     return v;
   });
   // Duan smearing: log-space regression predicts the median; smear turns it into the mean.
-  return { pm: Math.max(Math.exp(z) * (m.smear ?? 1) - 1, 0), contrib };
+  // lo/hi: 80% interval from residual quantiles on the training period.
+  return {
+    pm: Math.max(Math.exp(z) * (m.smear ?? 1) - 1, 0),
+    median: Math.max(Math.expm1(z), 0),
+    lo: Math.max(Math.expm1(z + (m.q10 ?? 0)), 0),
+    hi: Math.max(Math.expm1(z + (m.q90 ?? 0)), 0),
+    contrib,
+  };
 }
