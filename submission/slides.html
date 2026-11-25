@@ -96,13 +96,13 @@
   <h2>Проблема: смог в котловине, а прогнозы его не видят</h2>
   <div class="kpi">
     <div class="card"><div class="v">34%</div><div class="l">смога Алматы — сжигание угля и биомассы: 18% ТЭЦ и котельные, 16% частный сектор<br><span class="small">кейс, Bizmedia</span></div></div>
-    <div class="card"><div class="v">32%</div><div class="l">дорожная пыль<br><span class="small">кейс, Bizmedia</span></div></div>
+    <div class="card"><div class="v">43 мкг/м³</div><div class="l">средний PM2.5 у 352 школ Алматы за учебный сезон; 76 из 157 учебных дней выше суточного норматива РК<br><span class="small">по оценке фонда Almaty Air Initiative, в пересказе Kursiv, 29.05.2026</span></div></div>
     <div class="card" style="border:3px solid var(--lvl4)"><div class="v" style="color:#b04a3c">в 3,2 раза</div><div class="l">занижает смог модель CAMS: в 201 часе, когда станция показывала &gt;100 мкг/м³ (медиана 127), CAMS — медиана 40<br><span class="small">наш расчёт: OpenAQ 8876, фев–мар и окт–ноя 2025, evals/forecast_report.md</span></div></div>
   </div>
   <div class="row">
     <div class="col card">
-      <p style="margin:0 0 12px"><b>Глобальная модель CAMS</b> (сетка около 40 км) — основа популярных прогнозов. Инверсия «запирает» дым в котловине, а модель этого не видит.</p>
-      <p style="margin:0">Завуч решает про физкультуру на глаз, родители узнают о смоге из чатов.</p>
+      <p style="margin:0 0 12px"><b>Правила для урока нет.</b> Дистанционка разрешена только при НМУ 2–3 степени и превышении ПДК больше чем в 3 раза; сенатор отметил, что правила Минпросвещения не описывают действия школ при смоге <span class="small">(Tengrinews, 01.12.2025)</span>.</p>
+      <p style="margin:0">Завуч решает про физкультуру на глаз, а популярные прогнозы на модели CAMS смог в котловине занижают.</p>
     </div>
     <div class="col card" data-unless="quote.text" style="display:flex;gap:36px;align-items:center">
       <div><p class="muted" style="margin:0 0 6px">6 февраля 2025, 09:00, у школы</p>
@@ -248,16 +248,19 @@
 <!-- 9. Value and scale -->
 <section class="slide">
   <h2>Польза и масштаб</h2>
+  <div class="kpi">
+    <div class="card"><div class="v">360 школ</div><div class="l">357 222 ученика в Алматы<br><span class="small">акимат Алматы, 2025–26 уч. год</span></div></div>
+    <div class="card"><div class="v">≈1,07 млн</div><div class="l">ученико-уроков физкультуры в неделю: 3 ч в неделю в 1–9 классах<br><span class="small">приказ МП РК № 365 (2022); наш расчёт 357 222 × 3</span></div></div>
+    <div class="card"><div class="v">1 на 22</div><div class="l">поста Казгидромета на школы: 16 постов на 360 школ<br><span class="small">акимат, 27.11.2025; наш расчёт</span></div></div>
+  </div>
   <div class="row">
     <div class="col">
-      <div class="card" style="margin-bottom:26px"><p style="margin:0"><b>Стоимость сейчас:</b> статический сайт + одна серверная функция, без ключей и аккаунтов. Код не привязан к Алматы, кроме карты районов.</p></div>
-      <div class="card" style="margin-bottom:26px"><p style="margin:0"><b>Узкое место — датчики.</b> Живых исправных 25.11.2026 (наш подсчёт): Алматы 2 AirKaz + 3 sensor.community; Астана 0 + 1; Караганда 0 + 3; Шымкент 0 + 0.</p></div>
-      <div class="card"><p style="margin:0"><b>Следующий шаг:</b> недорогой датчик во дворе школы — сразу точка на карте и старт прогноза.</p></div>
+      <div class="card" style="margin-bottom:22px"><p style="margin:0;font-size:27px"><b>Прецеденты.</b> США: программа EPA Air Quality Flag — 700+ школ в 12 штатах меняют физкультуру по цвету флага <span class="small">(EPA, 2012)</span>. Усть-Каменогорск: 66 школ на дистанционке из-за смога (окт. 2025) и регламент школ при НМУ <span class="small">(02.02.2026)</span> — но только «вся школа», не урок.</p></div>
+      <div class="card"><p style="margin:0;font-size:27px"><b>Стоимость:</b> статический сайт + одна серверная функция, без ключей и аккаунтов; код не привязан к Алматы.</p></div>
     </div>
     <div class="col">
-      <div class="card" style="margin-bottom:26px"><p style="margin:0"><b>Путь внедрения:</b> пилот в 2–3 школах одного района (завуч + учитель физкультуры) → месяц журнала решений → районный и городской отдел образования.</p></div>
-      <div class="card" style="margin-bottom:26px;border:2px dashed #c9a52a"><p style="margin:0"><b>Кто платит — гипотеза:</b> отделы образования (страница района, журнал решений) и школы (датчик во дворе). Не проверено.</p></div>
-      <div class="card"><p style="margin:0"><b>Рассылка:</b> объявление уже на двух языках; дальше — «Поделиться» в чат класса и утренняя рассылка по расписанию физкультуры.</p></div>
+      <div class="card" style="margin-bottom:22px"><p style="margin:0;font-size:27px"><b>Узкое место — датчики:</b> живых исправных 25.11.2026 (наш подсчёт) в Алматы 2 AirKaz + 3 sensor.community; в Астане, Караганде, Шымкенте 0–3. Шаг — недорогой датчик во дворе школы.</p></div>
+      <div class="card"><p style="margin:0;font-size:27px"><b>Путь:</b> пилот в 2–3 школах района → месяц журнала решений «зал / улица» → отдел образования. Кто платит — гипотеза: отделы образования и школы.</p></div>
     </div>
   </div>
   <div class="num">9</div>
