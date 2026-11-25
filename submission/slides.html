@@ -169,7 +169,7 @@
     <div class="arrow">→</div>
     <div class="step"><div class="cap"><b>4. Школа</b>3-й урок — в зал, объявление kk/ru</div><img class="phone" src="img/school_announce_ru.png" style="width:390px"></div>
   </div>
-  <p class="small" style="margin:10px 0 0">Зимний пример из архива (кнопка «Зимний пример» или <b>?demo=winter</b>): решение «в зал или нет» совпало с фактом в 13 из 13 уроков этого эпизода.</p>
+  <p class="small" style="margin:10px 0 0">Зимний пример из архива (кнопка «Зимний пример» или <b>?demo=winter</b>): решение «в зал или нет» совпало с фактом в 13 из 13 уроков этого эпизода (весь день грязный, это лёгкий случай; решает прогноз).</p>
   <div class="num">5</div>
 </section>
 
@@ -206,24 +206,21 @@
       <p class="muted" style="margin:0 0 10px;font-size:26px">Ошибка прогноза 1–48 ч, MAE, мкг/м³ (меньше — лучше)</p>
       <table>
         <tr><th></th><th>Все часы</th><th>Смог &gt; 100</th></tr>
-        <tr class="hl"><td>Наша модель</td><td>17,9</td><td>60,6</td></tr>
-        <tr><td>«Будет как сейчас»</td><td>23,7</td><td>55,2</td></tr>
-        <tr><td>CAMS как есть</td><td>22,7</td><td>92,3</td></tr>
-        <tr class="hl"><td>max(модель, датчик)</td><td>—</td><td>41,8</td></tr>
+        <tr class="hl"><td>Наша модель</td><td>17,6</td><td>60,6</td></tr>
+        <tr><td>«Будет как сейчас»</td><td>23,1</td><td>53,7</td></tr>
+        <tr><td>CAMS как есть</td><td>22,4</td><td>92,4</td></tr>
       </table>
-      <p class="small" style="margin-top:18px">Честно: в сильный смог модель хуже правила «как сейчас» — поэтому школа решает по max(модель, датчик).</p>
+      <p class="small" style="margin-top:18px">Честно: в сильный смог модель хуже правила «как сейчас». Поэтому датчик «сейчас» учитывается на ближайшие 3 часа, дальше решает прогноз.</p>
     </div>
     <div class="col">
-      <p class="muted" style="margin:0 0 10px;font-size:26px">Решение «физкультура на улице?» (граница EPA 35,4)</p>
+      <p class="muted" style="margin:0 0 10px;font-size:26px">Поймано грязных часов (&gt; 35,4) при равной доле уроков в зале</p>
       <table>
-        <tr><th>Правило</th><th>Точность</th><th>Поймано грязных часов</th></tr>
-        <tr><td>Наша модель</td><td>75%</td><td>72%</td></tr>
-        <tr><td>«Будет как сейчас»</td><td>70%</td><td>60%</td></tr>
-        <tr><td>CAMS</td><td>67%</td><td>40%</td></tr>
-        <tr class="hl"><td>max(модель, датчик) — в школе</td><td>70%</td><td>87%</td></tr>
-        <tr><td>«Всегда на улице»</td><td>63%</td><td>0%</td></tr>
+        <tr><th>Правило</th><th>30%</th><th>40%</th><th>50%</th></tr>
+        <tr class="hl"><td>Наша модель</td><td>48%</td><td>60%</td><td>71%</td></tr>
+        <tr><td>«Будет как сейчас»</td><td>44%</td><td>55%</td><td>66%</td></tr>
+        <tr><td>CAMS</td><td>42%</td><td>54%</td><td>64%</td></tr>
       </table>
-      <p class="small" style="margin-top:18px">Цена: уроков в зале 57% часов против 41%. Пропустить грязный урок хуже, чем лишний раз уйти в зал.</p>
+      <p class="small" style="margin-top:18px">Честный отрыв: 4–7 пунктов, интервалы перекрываются. Школа держит в зале 72% уроков и ловит 90% грязных часов; у «как сейчас» — 36% и 51%, у CAMS — 19% и 28% (при разной доле не сравнимо).</p>
     </div>
   </div>
   <p class="small" style="margin:0">Станция OpenAQ 8876, тест фев–мар и окт–ноя 2025; соседние часы автокоррелированы. Воспроизводится: pipeline/train_forecast.py → evals/forecast_report.md.</p>

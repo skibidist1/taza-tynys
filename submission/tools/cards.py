@@ -1,4 +1,4 @@
-"""Video-only cards (not in the deck): 'rule' (87% vs 40%) and 'final' (title + link, light, no black frame).
+"""Video-only cards (not in the deck): 'rule' (caught dirty hours at equal indoor share) and 'final' (title + link, light, no black frame).
 
 Numbers come from data/forecast_model.json; team line from team.json (hidden if empty).
 Usage: python3 tools/cards.py  -> build/cards/rule.png, final.png
@@ -19,7 +19,7 @@ body{margin:0;font-family:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"H
 background:radial-gradient(1200px 700px at 100% 0%,rgba(159,216,200,.55),transparent 60%),linear-gradient(180deg,#f7faf9,#eef4f2)}
 h2{font-size:64px;margin:0 0 50px;letter-spacing:-1px}
 .bars{display:grid;gap:26px}
-.r{display:grid;grid-template-columns:640px 1fr 150px;align-items:center;gap:28px;font-size:38px}
+.r{display:grid;grid-template-columns:560px 1fr 1fr 1fr;align-items:center;gap:28px;font-size:38px}
 .t{height:64px;border-radius:18px;background:rgba(21,48,43,.08);overflow:hidden}.t i{display:block;height:100%;border-radius:18px}
 .v{font-weight:800;font-size:56px;text-align:right}
 .n{font-size:30px;color:#4d6661;margin-top:44px;max-width:1500px;line-height:1.35}
@@ -35,14 +35,17 @@ def main():
     out = SUB / "build" / "cards"
     out.mkdir(parents=True, exist_ok=True)
     m = json.loads((SUB.parent / "data" / "forecast_model.json").read_text())["metrics"]
-    rec = m["decision_recall_bad"]
-    rows = [("Школа: max(прогноз, датчик)", rec["max_model_now"], "#2f9f88", True), ("Наша модель", rec["model"], "#9fd8c8", False),
-            ("«Будет как сейчас»", rec["persistence"], "#c4cfcc", False), ("CAMS", rec["cams"], "#db6f60", False)]
-    bars = "".join(f'<div class="r"><span class="{"hl" if hl else ""}">{html.escape(n)}</span><div class="t"><i style="width:{v*100:.0f}%;background:{c}"></i></div>'
-                   f'<span class="v">{v*100:.0f}%</span></div>' for n, v, c, hl in rows)
-    rule = f'''<div class="c"><h2>Сколько грязных часов поймано <span style="font-size:40px;color:#4d6661;font-weight:500;white-space:nowrap">(факт выше 35,4 мкг/м³)</span></h2><div class="bars">{bars}</div>
-      <p class="n">Тест строго позже обучения, станция OpenAQ 8876. В сильный смог модель хуже «как сейчас», поэтому школа решает по большему из прогноза и датчика:
-      точность {m["decision_acc"]["max_model_now"]*100:.0f}% против {m["decision_acc"]["model"]*100:.0f}% у модели, зато пропущенных грязных уроков меньше.</p></div>'''
+    d = m["school_hours"]["decisions"]
+    rows = [("Наша модель", d["model"], "#2f9f88", True), ("«Будет как сейчас»", d["persistence"], "#c4cfcc", False),
+            ("CAMS", d["cams"], "#db6f60", False)]
+    head = '<div class="r"><span></span>' + "".join(f'<span class="v" style="font-size:36px;text-align:center">{k}% уроков в зале</span>' for k in ("30", "40", "50")) + "</div>"
+    bars = head + "".join(
+        f'<div class="r"><span class="{"hl" if hl else ""}">{html.escape(n)}</span>'
+        + "".join(f'<span class="v" style="text-align:center;background:{c};border-radius:18px;padding:8px 0;color:#15302b">{x["recall_at_share"][k]*100:.0f}%</span>' for k in ("30", "40", "50"))
+        + '</div>' for n, x, c, hl in rows)
+    rule = f'''<div class="c"><h2>Сколько грязных часов поймано <span style="font-size:40px;color:#4d6661;font-weight:500;white-space:nowrap">(факт выше 35,4 мкг/м³)</span></h2>
+      <p class="n" style="margin:-20px 0 30px">Честное сравнение: при одинаковой доле уроков в зале</p><div class="bars">{bars}</div>
+      <p class="n">Отрыв модели 4–7 пунктов, интервалы перекрываются. Тест строго позже обучения, станция OpenAQ 8876. Датчик «сейчас» учитывается только на ближайшие 3 часа, дальше решает прогноз.</p></div>'''
     f = load()
     team = " · ".join(x for x in [f"команда {html.escape(f['team'])}" if f["team"] else "", html.escape(f["members"]), html.escape(f["contact"])] if x)
     final = f'''<div class="c"><h1>Таза Тыныс</h1><p class="lead">Про физкультуру решает реальный воздух, а не догадка.</p>
