@@ -9,6 +9,7 @@ Writes evals/small_sample.md and data/small_sample.json. This is a SMALL sample:
 Usage: python3 pipeline/make_sensors_snapshot.py && python3 pipeline/eval_small_sample.py
 """
 import json
+import os
 import pathlib
 import sys
 import urllib.parse
@@ -16,7 +17,7 @@ import urllib.request
 from datetime import datetime, timedelta
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-LOG_DIR = ROOT.parent.parent / "data-logs" / "airkaz"
+LOG_DIR = pathlib.Path(os.environ.get("TAZA_LOG_DIR", ROOT.parent.parent / "data-logs" / "airkaz"))
 sys.path.insert(0, str(ROOT / "pipeline"))
 from forecast_features import features, predict  # noqa: E402
 

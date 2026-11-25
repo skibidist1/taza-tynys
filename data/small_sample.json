@@ -1,7 +1,7 @@
 {
- "generated": "2026-11-25T09:43",
- "snapshot": "2026-11-25T09:35+05:00",
- "log_lines": 2,
+ "generated": "2026-11-25T10:04",
+ "snapshot": "2026-11-25T10:04+05:00",
+ "log_lines": 5,
  "results": [
   {
    "sample": "A: AirKaz, последние сутки",
@@ -11,11 +11,11 @@
    "hours": 23,
    "pairs": 253,
    "mae": {
-    "model": 19.28751921511672,
-    "persistence": 24.514545454545456,
-    "cams": 27.434545454545454
+    "model": 18.0944633697878,
+    "persistence": 24.290592885375492,
+    "cams": 26.21102766798419
    },
-   "sensor_median": 36.17,
+   "sensor_median": 35.75,
    "cams_median": 9.8
   },
   {
@@ -26,11 +26,11 @@
    "hours": 23,
    "pairs": 253,
    "mae": {
-    "model": 9.450078014972416,
-    "persistence": 10.042687747035574,
-    "cams": 15.523754940711461
+    "model": 10.689151134554283,
+    "persistence": 9.77509881422925,
+    "cams": 16.459486166007906
    },
-   "sensor_median": 6.42,
+   "sensor_median": 6.32,
    "cams_median": 24.2
   }
  ]

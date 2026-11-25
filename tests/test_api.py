@@ -22,8 +22,9 @@ def row(**kw):
 
 
 def test_bad_hour_and_bad_rows_do_not_break():
-    rows = [row(), row(hour="99", pm25="30"), row(hour="-3"), row(lat="x"), {"junk": 1}, row(hour="8", pm25="25"), row(hour="9", pm25="999")]
+    rows = [row(), row(id="2", city="Бишкек"), row(hour="99", pm25="30"), row(hour="-3"), row(lat="x"), {"junk": 1}, row(hour="8", pm25="25"), row(hour="9", pm25="999")]
     out = sensors.parse_airkaz(page(rows), NOW)
+    assert all(x["id"] != "ak-2" for x in out), "other cities must be dropped"
     s = [x for x in out if x["id"] == "ak-1"][0]
     assert s["pm25"] == 20.0
     assert s["history"] == [["2026-11-25T08:00", 25.0]], s["history"]

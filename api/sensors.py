@@ -44,6 +44,8 @@ def parse_airkaz(html, now):
     by = {}
     for x in data:
         try:  # one broken row must not kill the whole source
+            if x.get("city") not in (None, "", "Алматы"):
+                continue  # the page also lists sensors of other cities
             lat, lon = float(x["lat"]), float(x["lng"])
             stamp = datetime.strptime(x["date"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=ALMATY)
             s = by.setdefault(x["id"], {"id": f"ak-{x['id']}", "src": "airkaz", "name": x.get("name") or "",

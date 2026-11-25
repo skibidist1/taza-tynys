@@ -96,8 +96,8 @@ def test_offline_chain():
 
 if __name__ == "__main__":
     if not pathlib.Path(JSC).exists():
-        print("SKIP: jsc not found")
-        sys.exit(0)
+        print("SKIPPED: JavaScriptCore (jsc) not found - JS logic NOT tested")
+        sys.exit(2)
     fails = 0
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

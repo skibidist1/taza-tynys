@@ -45,8 +45,7 @@ def test_python_cases():
 
 def test_js_matches_python():
     if not pathlib.Path(JSC).exists():
-        print("SKIP: jsc not found")
-        return
+        raise AssertionError("SKIPPED: JavaScriptCore (jsc) not found - JS twin NOT tested")
     r = subprocess.run([JSC, "-m", "tests/forecast_harness.mjs", "--", "tests/forecast_cases.json", "data/forecast_model.json"],
                        cwd=ROOT, capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
