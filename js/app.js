@@ -59,6 +59,34 @@ function applyStatic() {
   document.documentElement.lang = getLang() === 'kk' ? 'kk' : 'ru';
   document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
   $('#lang').textContent = t('lang');
+  renderTheme();
+}
+
+// ---------- theme ----------
+// '' = follow the device, 'light' / 'dark' = chosen; the inline script in <head> applies it before first paint.
+const THEMES = ['', 'light', 'dark'];
+const metaAuto = [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => [m, m.content]);
+function currentTheme() { const v = document.documentElement.dataset.theme; return v === 'light' || v === 'dark' ? v : ''; }
+function syncThemeColor() {
+  // media-queried theme-color tags follow the device only; with an explicit choice both tags get the real page colour
+  const chosen = currentTheme();
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  metaAuto.forEach(([m, orig]) => { m.content = chosen && bg ? bg : orig; });
+}
+function renderTheme() {
+  const cur = currentTheme();
+  const name = t(`theme_${cur || 'auto'}`);
+  const b = $('#theme');
+  b.dataset.mode = cur || 'auto';
+  b.setAttribute('aria-label', `${t('theme_label')}: ${name} (${t('theme_hint')})`);
+  b.title = `${t('theme_label')}: ${name}`;
+  syncThemeColor();
+}
+function cycleTheme() {
+  const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
+  if (next) document.documentElement.dataset.theme = next; else delete document.documentElement.dataset.theme;
+  store.set('theme', next || null);
+  renderTheme();
 }
 
 // ---------- status ----------
@@ -147,6 +175,7 @@ function renderHero() {
   const sn = state.snLoad.sensors;
   if (state.pmNow == null) {
     $('#hero').style.setProperty('--hero', 'var(--line)');
+    $('#hero').style.removeProperty('--hero-on');
     $('#hero').innerHTML = `<p class="kicker">${esc(t('now_title'))} · ${esc(pointLabel())}</p>
       <div class="big"><span class="value small-v">${esc(t('no_data'))}</span></div><div class="facts"><span>${esc(t('no_data_hint'))}</span></div>`;
     return;
@@ -162,6 +191,7 @@ function renderHero() {
   const v = shown(pm);
   const pe = { verdict: v > 55.4 ? 'no' : v > 35.4 ? 'light' : 'yes' };
   $('#hero').style.setProperty('--hero', catVar(shown(pm)));
+  $('#hero').style.setProperty('--hero-on', `var(--on${catOf(shown(pm))})`);
   $('#hero').innerHTML = `
     <p class="kicker">${esc(t('now_title'))} · ${esc(pointLabel())}</p>
     <div class="big"><span class="value">${fmtPm(pm)}</span><span class="unit">${esc(t('pm_unit'))}</span><span class="pill">${esc(catName(pm))}</span></div>
@@ -287,7 +317,7 @@ function renderWindows() {
 function renderLegend() {
   const b = [0, ...EPA_STEPS];
   $('#legend').innerHTML = `<h2>${esc(t('legend_title'))}</h2>
-    <div class="lg">${CAT_KEYS.map((k, i) => `<div style="background:var(--lvl${i})"><b>${i < 5 ? `${num(b[i], 1)}–${num(b[i + 1], 1)}` : `> ${num(225.4, 1)}`}</b>${esc(t(`cat_${k}`))}</div>`).join('')}</div>`;
+    <div class="lg">${CAT_KEYS.map((k, i) => `<div style="background:var(--lvl${i});color:var(--on${i})"><b>${i < 5 ? `${num(b[i], 1)}–${num(b[i + 1], 1)}` : `> ${num(225.4, 1)}`}</b>${esc(t(`cat_${k}`))}</div>`).join('')}</div>`;
 }
 
 function renderToday() {
@@ -330,7 +360,7 @@ function renderWhy() {
     <article class="card gauge">
       <p class="hint">${esc(t('why_for', { t: `${dayName(h.time.slice(0, 10))} ${hhmm(h.time)}` }))}</p>
       <h2>${esc(t('why_title'))}</h2>
-      <div class="pct" style="color:${catVar(h.fc)}">${fmtPm(h.fc)} <span class="unit">${esc(t('pm_unit'))}</span></div>
+      <div class="pct" style="--c:${catVar(h.fc)}">${fmtPm(h.fc)} <span class="unit">${esc(t('pm_unit'))}</span></div>
       <p class="story">${esc(t('why_fc', { fc: fmtPm(h.fc), cat: catName(h.fc), cams: num(h.cams) }))}</p>
       ${phys.map((p) => `<p>${esc(p)}</p>`).join('')}
     </article>
@@ -623,6 +653,8 @@ async function refreshSensors(preferCache) {
 
 document.querySelectorAll('.tabs button').forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
 window.addEventListener('hashchange', () => { const n = tabFromHash(); if (TABS.includes(n) && n !== state.tab) showTab(n); });
+$('#theme').onclick = cycleTheme;
+window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', renderTheme);
 $('#lang').onclick = () => { setLang(getLang() === 'kk' ? 'ru' : 'kk'); renderAll(); };
 applyStatic();
 if (TABS.includes(tabFromHash())) showTab(tabFromHash());

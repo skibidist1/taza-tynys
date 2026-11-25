@@ -125,6 +125,11 @@ export const DICT = {
     test_period: 'февраль–март и октябрь–ноябрь 2025 (отопительный сезон), станция OpenAQ 8876',
     load_error: 'Ошибка загрузки', u_ms: 'м/с', lbl_inv: 'T850 − T2м', lbl_blh: 'м · слой',
     lang: 'Тіл: қазақша',
+    theme_label: 'Тема',
+    theme_auto: 'Авто',
+    theme_light: 'Светлая',
+    theme_dark: 'Тёмная',
+    theme_hint: 'нажмите, чтобы сменить',
     install_offline: 'Без сети показываем последние сохранённые данные.',
   },
   kk: {
@@ -249,6 +254,11 @@ export const DICT = {
     h_sources: 'Датчиктер: AirKaz.org, sensor.community. Тарих: OpenAQ ашық мұрағаты (8876 станциясы). Ауа райы болжамы мен CAMS: Open-Meteo. Санаттар: US EPA AQI (2024), Air Quality Guide for Particle Pollution, Air Quality Flag Program. Бағдар: ДДСҰ 2021. Жоғарыдан тұтату: Makonese et al., 2017.',
     h_reports: 'Есептер: evals/forecast_report.md, evals/small_sample.md',
     lang: 'Язык: русский',
+    theme_label: 'Тақырып',
+    theme_auto: 'Авто',
+    theme_light: 'Ашық',
+    theme_dark: 'Қараңғы',
+    theme_hint: 'ауыстыру үшін басыңыз',
     install_offline: 'Желі болмаса, соңғы сақталған деректерді көрсетеміз.',
   },
 };

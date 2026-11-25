@@ -4,7 +4,7 @@
   --card: rgba(255, 255, 255, 0.78);
   --ink: #15302b;
   --ink2: #4d6661;
-  --ink3: #7f9692;
+  --ink3: #5b746f;
   --line: rgba(21, 48, 43, 0.1);
   --accent: #2f7d6d;
   --lvl0: #9fd8c8;
@@ -13,34 +13,75 @@
   --lvl3: #f1aa72;
   --lvl4: #db6f60;
   --lvl5: #8e4f78;
+  --on0: #0a1512;
+  --on1: #0a1512;
+  --on2: #0a1512;
+  --on3: #0a1512;
+  --on4: #0a1512;
+  --on5: #ffffff;
   --trap: #2b3b4a;
   --win: #2f9f88;
-  --radius: 22px;
   --shadow: 0 1px 2px rgba(21, 48, 43, 0.05), 0 12px 32px -18px rgba(21, 48, 43, 0.25);
+  --radius: 22px;
   --font: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
+/* Dark theme: follows the device unless the user picked a theme (html[data-theme]).
+   The same values live in the media block and in the explicit [data-theme="dark"] block. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0f1a18;
     --bg2: #13211e;
     --card: rgba(26, 42, 38, 0.82);
     --ink: #e3efec;
-    --ink2: #a9bfba;
-    --ink3: #7c938e;
-    --line: rgba(227, 239, 236, 0.1);
+    --ink2: #c0d3ce;
+    --ink3: #93aaa5;
+    --line: rgba(227, 239, 236, 0.12);
     --accent: #7cc9b6;
-    --lvl0: #5fae99;
-    --lvl1: #93b765;
-    --lvl2: #c9ae55;
-    --lvl3: #d08550;
-    --lvl4: #c05a4c;
-    --lvl5: #a2648e;
+    --lvl0: #5fb89f;
+    --lvl1: #9cc263;
+    --lvl2: #d4b84a;
+    --lvl3: #e0954f;
+    --lvl4: #e5675a;
+    --lvl5: #b98ae0;
+    --on0: #0a1512;
+    --on1: #0a1512;
+    --on2: #0a1512;
+    --on3: #0a1512;
+    --on4: #0a1512;
+    --on5: #0a1512;
     --trap: #d9e4ec;
     --win: #6fd3bb;
     --shadow: 0 12px 32px -18px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1a18;
+  --bg2: #13211e;
+  --card: rgba(26, 42, 38, 0.82);
+  --ink: #e3efec;
+  --ink2: #c0d3ce;
+  --ink3: #93aaa5;
+  --line: rgba(227, 239, 236, 0.12);
+  --accent: #7cc9b6;
+  --lvl0: #5fb89f;
+  --lvl1: #9cc263;
+  --lvl2: #d4b84a;
+  --lvl3: #e0954f;
+  --lvl4: #e5675a;
+  --lvl5: #b98ae0;
+  --on0: #0a1512;
+  --on1: #0a1512;
+  --on2: #0a1512;
+  --on3: #0a1512;
+  --on4: #0a1512;
+  --on5: #0a1512;
+  --trap: #d9e4ec;
+  --win: #6fd3bb;
+  --shadow: 0 12px 32px -18px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -125,7 +166,7 @@ main { padding-bottom: 24px; }
 .hero .big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .hero .value { font-size: clamp(3.6rem, 16vw, 5.2rem); font-weight: 700; line-height: 0.95; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
 .hero .unit { color: var(--ink2); }
-.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; background: var(--hero); color: #15302b; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; background: var(--hero); color: var(--hero-on, var(--on0)); }
 .hero .facts { display: grid; gap: 2px; color: var(--ink2); font-size: 0.92rem; margin-top: 6px; }
 .loading { color: var(--ink3); }
 
@@ -188,12 +229,12 @@ main { padding-bottom: 24px; }
 
 /* Legend */
 .lg { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 10px; }
-.lg div { border-radius: 10px; padding: 8px 6px; font-size: 0.72rem; line-height: 1.2; color: #15302b; }
+.lg div { border-radius: 10px; padding: 8px 6px; font-size: 0.72rem; line-height: 1.2; }
 .lg b { display: block; font-size: 0.8rem; }
 
 /* Why */
 .gauge { display: grid; gap: 10px; }
-.gauge .pct { font-size: 3rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.gauge .pct { color: var(--ink); border-left: 8px solid var(--c); padding-left: 12px; font-size: 3rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
 .track { position: relative; height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--lvl0), var(--lvl2), var(--lvl4)); }
 .track .dot { position: absolute; top: 50%; width: 22px; height: 22px; border-radius: 50%; background: var(--card); border: 3px solid var(--ink); transform: translate(-50%, -50%); }
 .track .thr { position: absolute; top: -6px; bottom: -6px; width: 2px; background: var(--ink); opacity: 0.4; }
@@ -308,7 +349,7 @@ main { padding-bottom: 24px; }
 .hero .big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .hero .value { font-size: clamp(3.6rem, 16vw, 5.2rem); font-weight: 700; line-height: 0.95; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
 .hero .unit { color: var(--ink2); }
-.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; background: var(--hero); color: #15302b; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; background: var(--hero); color: var(--hero-on, var(--on0)); }
 .hero .facts { display: grid; gap: 2px; color: var(--ink2); font-size: 0.92rem; margin-top: 6px; }
 .loading { color: var(--ink3); }
 
@@ -371,12 +412,12 @@ main { padding-bottom: 24px; }
 
 /* Legend */
 .lg { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 10px; }
-.lg div { border-radius: 10px; padding: 8px 6px; font-size: 0.72rem; line-height: 1.2; color: #15302b; }
+.lg div { border-radius: 10px; padding: 8px 6px; font-size: 0.72rem; line-height: 1.2; }
 .lg b { display: block; font-size: 0.8rem; }
 
 /* Why */
 .gauge { display: grid; gap: 10px; }
-.gauge .pct { font-size: 3rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.gauge .pct { color: var(--ink); border-left: 8px solid var(--c); padding-left: 12px; font-size: 3rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
 .track { position: relative; height: 12px; border-radius: 999px; background: linear-gradient(90deg, var(--lvl0), var(--lvl2), var(--lvl4)); }
 .track .dot { position: absolute; top: 50%; width: 22px; height: 22px; border-radius: 50%; background: var(--card); border: 3px solid var(--ink); transform: translate(-50%, -50%); }
 .track .thr { position: absolute; top: -6px; bottom: -6px; width: 2px; background: var(--ink); opacity: 0.4; }
@@ -487,3 +528,45 @@ details summary { cursor: pointer; color: var(--ink2); font-size: 0.9rem; }
 .osm { font-size: 9px; fill: var(--ink3); text-anchor: end; }
 .profiles { flex-wrap: wrap; overflow-x: visible; }
 .profiles .chip { max-width: 100%; white-space: normal; text-align: left; }
+
+/* Theme switch */
+.top-actions { display: flex; gap: 8px; align-items: center; }
+.theme-btn { display: inline-grid; place-items: center; width: 36px; height: 34px; padding: 0; }
+.theme-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.theme-btn .ic { display: none; }
+.theme-btn[data-mode="auto"] .ic-auto, .theme-btn[data-mode="light"] .ic-light, .theme-btn[data-mode="dark"] .ic-dark { display: block; }
+.ghost:focus-visible, .chip:focus-visible, .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Print is always light, whatever the device or the chosen theme */
+@media print {
+  :root, :root:not([data-theme="light"]), :root[data-theme="dark"] {
+    --bg: #eef4f2;
+    --bg2: #f7faf9;
+    --card: rgba(255, 255, 255, 0.78);
+    --ink: #15302b;
+    --ink2: #4d6661;
+    --ink3: #5b746f;
+    --line: rgba(21, 48, 43, 0.1);
+    --accent: #2f7d6d;
+    --lvl0: #9fd8c8;
+    --lvl1: #c4e09a;
+    --lvl2: #efd781;
+    --lvl3: #f1aa72;
+    --lvl4: #db6f60;
+    --lvl5: #8e4f78;
+    --on0: #0a1512;
+    --on1: #0a1512;
+    --on2: #0a1512;
+    --on3: #0a1512;
+    --on4: #0a1512;
+    --on5: #ffffff;
+    --trap: #2b3b4a;
+    --win: #2f9f88;
+    --shadow: 0 1px 2px rgba(21, 48, 43, 0.05), 0 12px 32px -18px rgba(21, 48, 43, 0.25);
+    color-scheme: light;
+  }
+  body { background: #fff; }
+  .theme-btn, #lang { display: none; }
+  .card, .hero { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
