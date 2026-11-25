@@ -51,14 +51,21 @@ function applyStatic() {
 function renderStatus() {
   const { load, data } = state;
   const ts = `${dateLong(data.fetchedAt.slice(0, 10))}, ${data.fetchedAt.slice(11, 16)}`;
-  const key = { live: 'src_live', cache: 'src_cache', snapshot: 'src_snapshot' }[load.source];
+  const key = { live: 'src_live', cache: 'src_cache', snapshot: 'src_snapshot', archive: 'src_archive' }[load.source];
   let html = `<b>${esc(t(key, { t: ts }))}</b>`;
   if (load.source !== 'live' && load.error) html += ` <span class="warn">${esc(t('src_offline'))}</span>`;
   if (data.stale) html += ` <span class="warn">${esc(t('src_stale'))}</span>`;
-  html += ` <button class="ghost" id="refresh" type="button">${esc(t('refresh'))}</button>`;
-  html += `<span class="note">${esc(t('src_note'))}</span>`;
+  if (load.source === 'archive') {
+    html += ` <button class="ghost" id="live" type="button">${esc(t('back_live'))}</button>`;
+  } else {
+    html += ` <button class="ghost" id="refresh" type="button">${esc(t('refresh'))}</button>`;
+    html += ` <button class="ghost" id="winter" type="button">${esc(t('show_winter'))}</button>`;
+  }
+  html += `<span class="note">${esc(t(load.source === 'archive' ? 'archive_note' : 'src_note'))}</span>`;
   $('#status').innerHTML = html;
-  $('#refresh').onclick = () => boot(false);
+  if ($('#refresh')) $('#refresh').onclick = () => boot(false);
+  if ($('#winter')) $('#winter').onclick = () => boot(true, 'archive');
+  if ($('#live')) $('#live').onclick = () => boot(true);
 }
 
 // ---------- today ----------
@@ -401,14 +408,22 @@ function renderAll() {
   renderHome();
 }
 
-async function boot(preferCache = true) {
+async function boot(preferCache = true, mode = 'live') {
   if (!state.model) {
     const [m, f] = await Promise.all([fetch('data/model.json').then((r) => r.json()), fetch('data/factors.json').then((r) => r.json())]);
     state.model = m;
     state.factors = f;
   }
-  state.load = await loadForecast({ preferCache });
-  state.data = normalize(state.load.raw, state.model);
+  if (mode === 'archive') {
+    // Real winter smog episode from the Open-Meteo archive, replayed as if "now" were its morning.
+    const raw = await fetch('data/demo_winter.json').then((r) => r.json());
+    state.load = { raw, source: 'archive' };
+    state.data = normalize(raw, state.model, Date.parse(raw.fetchedAt));
+  } else {
+    state.load = await loadForecast({ preferCache });
+    state.data = normalize(state.load.raw, state.model);
+  }
+  state.schoolDay = null;
   state.sel = state.data.nowIndex;
   renderAll();
 }
@@ -422,7 +437,7 @@ $('#lang').onclick = () => { setLang(getLang() === 'kk' ? 'ru' : 'kk'); renderAl
 applyStatic();
 const initial = location.hash.slice(1);
 if (['today', 'why', 'school', 'home'].includes(initial)) showTab(initial);
-boot().catch((e) => {
+boot(true, new URLSearchParams(location.search).get('demo') === 'winter' ? 'archive' : 'live').catch((e) => {
   $('#hero').innerHTML = `<p class="loading">Ошибка загрузки: ${esc(e.message || e)}</p>`;
 });
 

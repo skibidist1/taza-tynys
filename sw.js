@@ -15,6 +15,7 @@ const ASSETS = [
   'data/model.json',
   'data/factors.json',
   'data/snapshot.json',
+  'data/demo_winter.json',
   'icons/icon.svg',
   'icons/icon-192.png',
   'icons/icon-512.png',
