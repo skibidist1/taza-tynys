@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Таза Тыныс — презентация</title>
+<meta name="viewport" content="width=1920">
+<style>
+  :root {
+    --bg: #eef4f2; --bg2: #f7faf9; --card: #ffffff; --ink: #15302b; --ink2: #4d6661; --ink3: #7f9692;
+    --line: rgba(21,48,43,.12); --accent: #2f7d6d;
+    --lvl0: #9fd8c8; --lvl1: #c4e09a; --lvl2: #efd781; --lvl3: #f1aa72; --lvl4: #db6f60; --lvl5: #8e4f78; --win: #2f9f88;
+    --font: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @page { size: 1920px 1080px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #c9d6d2; font-family: var(--font); color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .slide { width: 1920px; height: 1080px; position: relative; overflow: hidden; margin: 0 auto 24px;
+    background: radial-gradient(1200px 700px at 100% 0%, rgba(159,216,200,.55), transparent 60%), linear-gradient(180deg, var(--bg2), var(--bg));
+    padding: 84px 110px 70px; page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+  @media print { body { background: none; } .slide { margin: 0; } }
+  .num { position: absolute; right: 70px; bottom: 44px; font-size: 22px; color: var(--ink3); }
+  .tag { position: absolute; left: 110px; bottom: 44px; font-size: 22px; color: var(--ink3); display: flex; gap: 12px; align-items: center; }
+  .tag svg { width: 30px; height: 30px; }
+  h1 { font-size: 112px; line-height: 1; margin: 0 0 28px; letter-spacing: -2px; }
+  h2 { font-size: 64px; line-height: 1.08; margin: 0 0 40px; letter-spacing: -1px; }
+  p, li, td, th { font-size: 30px; line-height: 1.35; }
+  .lead { font-size: 44px; line-height: 1.25; color: var(--ink); margin: 0 0 36px; max-width: 1400px; }
+  .muted { color: var(--ink2); }
+  .small { font-size: 22px; color: var(--ink2); }
+  .row { display: flex; gap: 48px; align-items: flex-start; flex: 1; min-height: 0; }
+  .col { flex: 1; min-width: 0; }
+  .card { background: var(--card); border-radius: 28px; padding: 34px 38px; box-shadow: 0 1px 2px rgba(21,48,43,.05), 0 18px 40px -22px rgba(21,48,43,.35); }
+  .big { font-size: 120px; font-weight: 800; line-height: 1; letter-spacing: -3px; }
+  .pill { display: inline-block; padding: 8px 22px; border-radius: 999px; font-weight: 700; font-size: 28px; }
+  .bad { background: #f6d6d1; color: #7a2418; }
+  .ok { background: #d7efe8; color: #1d5c4f; }
+  .phone { border-radius: 30px; box-shadow: 0 24px 50px -24px rgba(21,48,43,.5); border: 1px solid var(--line); display: block; background: #fff; }
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; color: var(--ink2); font-weight: 600; font-size: 26px; padding: 12px 16px; border-bottom: 2px solid var(--line); }
+  td { padding: 14px 16px; border-bottom: 1px solid var(--line); font-size: 28px; }
+  table.cmp td { font-size: 34px; padding: 22px 16px; } table.cmp th { font-size: 30px; }
+  tr.hl td { background: #e3f2ed; font-weight: 700; }
+  .ph { background: #fff4c7; border: 2px dashed #c9a52a; color: #6b5310; padding: 2px 12px; border-radius: 10px; font-weight: 600; }
+  ul { margin: 0; padding-left: 36px; } li { margin: 0 0 16px; }
+  .steps { display: flex; gap: 28px; flex: 1; min-height: 0; }
+  .step { flex: 1; display: flex; flex-direction: column; gap: 18px; align-items: center; }
+  .step .cap { font-size: 26px; line-height: 1.3; text-align: center; min-height: 104px; }
+  .step .cap b { display: block; font-size: 30px; }
+  .step img { max-height: 620px; max-width: 100%; }
+  .arrow { align-self: center; font-size: 64px; color: var(--accent); margin-top: -60px; }
+  .flow { display: flex; align-items: stretch; gap: 22px; margin-bottom: 36px; }
+  .box { flex: 1; background: #fff; border-radius: 22px; padding: 24px 24px; border: 2px solid var(--line); font-size: 26px; line-height: 1.3; }
+  .box b { display: block; font-size: 29px; margin-bottom: 6px; }
+  .box.ai { border-color: var(--accent); background: #e3f2ed; }
+  .farr { align-self: center; font-size: 46px; color: var(--accent); }
+  .kpi { display: flex; gap: 30px; margin-bottom: 34px; }
+  .kpi .card { flex: 1; }
+  .kpi .v { font-size: 76px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+  .kpi .l { font-size: 25px; color: var(--ink2); margin-top: 10px; line-height: 1.3; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+  .grid3 .card h3 { font-size: 34px; margin: 0 0 12px; }
+  .grid3 .card p { font-size: 26px; margin: 0; color: var(--ink2); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="logo" viewBox="0 0 48 48">
+    <circle cx="24" cy="24" r="22" fill="#9fd8c8"/>
+    <path d="M9 21c5-5 10-5 15 0s10 5 15 0" fill="none" stroke="#15302b" stroke-width="3" stroke-linecap="round"/>
+    <path d="M9 30c5-5 10-5 15 0s10 5 15 0" fill="none" stroke="#15302b" stroke-width="3" stroke-linecap="round" opacity=".45"/>
+  </symbol>
+</svg>
+
+<!-- 1. Title -->
+<section class="slide">
+  <div class="row" style="align-items:center">
+    <div class="col" style="flex:1.35">
+      <svg style="width:130px;height:130px;margin-bottom:30px"><use href="#logo"/></svg>
+      <h1>Таза Тыныс</h1>
+      <p class="lead">Воздух у школы Алматы: реальный датчик сейчас, наш прогноз на 48 часов и решение завуча «физкультура на улице или в зале» — с объявлением родителям на казахском и русском.</p>
+      <p style="font-size:36px;margin:0 0 14px"><b>Прототип:</b> taza-tynys.vercel.app</p>
+      <p style="font-size:30px;margin:0 0 14px" class="muted">Код: <span class="ph">{ССЫЛКА НА КОД}</span></p>
+      <p style="font-size:30px;margin:0" class="muted">Команда <span class="ph">{КОМАНДА}</span> · Órleu Hack 2026 · Кейс 1 «Экология Казахстана»</p>
+    </div>
+    <div class="col" style="flex:.65;display:flex;justify-content:center">
+      <img class="phone" src="img/phone_winter_top.png" style="height:880px" alt="Экран «Сейчас»">
+    </div>
+  </div>
+  <div class="num">1</div>
+</section>
+
+<!-- 2. Problem -->
+<section class="slide">
+  <h2>Проблема: смог в котловине, а прогнозы его не видят</h2>
+  <div class="kpi">
+    <div class="card"><div class="v">34%</div><div class="l">смога Алматы — сжигание угля и биомассы: 18% ТЭЦ и котельные, 16% частный сектор<br><span class="small">кейс, Bizmedia</span></div></div>
+    <div class="card"><div class="v">32%</div><div class="l">дорожная пыль<br><span class="small">кейс, Bizmedia</span></div></div>
+    <div class="card" style="border:3px solid var(--lvl4)"><div class="v" style="color:#b04a3c">в 3,2 раза</div><div class="l">занижает смог модель CAMS: в 201 часе, когда станция показывала &gt;100 мкг/м³ (медиана 127), CAMS — медиана 40<br><span class="small">наш расчёт: OpenAQ 8876, фев–мар и окт–ноя 2025, evals/forecast_report.md</span></div></div>
+  </div>
+  <div class="row">
+    <div class="col card">
+      <p style="margin:0 0 12px"><b>Глобальная модель CAMS</b> (сетка около 40 км) — основа популярных прогнозов. Инверсия «запирает» дым в котловине, а модель этого не видит.</p>
+      <p style="margin:0">Завуч решает про физкультуру на глаз, родители узнают о смоге из чатов.</p>
+    </div>
+    <div class="col card">
+      <p style="margin:0 0 10px" class="muted">Голос пользователя:</p>
+      <p style="margin:0;font-size:34px">«<span class="ph">{ЦИТАТА}</span>»</p>
+      <p class="small" style="margin-top:12px">— <span class="ph">{ИМЯ, ДОЛЖНОСТЬ, ШКОЛА}</span> (интервью команды)</p>
+    </div>
+  </div>
+  <div class="num">2</div>
+</section>
+
+<!-- 3. User -->
+<section class="slide">
+  <h2>Пользователь: завуч школы, 9 утра</h2>
+  <div class="row">
+    <div class="col">
+      <p class="lead" style="font-size:40px">6 февраля 2025. Физкультура 3-м уроком, 09:50. За окном серо.</p>
+      <ul>
+        <li>Приложение с глобальной моделью CAMS показывает <b>41</b> — по шкале EPA это «на улице, облегчённо».</li>
+        <li>Реальная станция в это время — <b>125 мкг/м³</b>, категория EPA «вредно».</li>
+        <li>Решать надо за минуты: класс выйдет на улицу или в зал? И как объяснить родителям?</li>
+      </ul>
+      <p class="muted" style="margin-top:24px">Пользователь №1 — завуч. Вторичные: учитель физкультуры, семьи.</p>
+    </div>
+    <div class="col" style="flex:.8;display:flex;justify-content:center">
+      <img class="phone" src="img/hero_winter.png" style="width:560px" alt="125 против 41">
+    </div>
+  </div>
+  <div class="num">3</div>
+</section>
+
+<!-- 4. Solution -->
+<section class="slide">
+  <h2>Решение: три функции</h2>
+  <div class="row">
+    <div class="col" style="flex:1.2">
+      <div class="grid3" style="grid-template-columns:1fr;gap:26px">
+        <div class="card"><h3>1. Реальный воздух у школы</h3><p>Ближайший живой датчик AirKaz или sensor.community вместо модельной цифры; рядом — сколько показывает CAMS в той же точке.</p></div>
+        <div class="card"><h3>2. Свой прогноз на 48 часов</h3><p>Обучен на реальных измерениях: инверсия, ветер, CAMS, время суток. Экран «Почему» объясняет каждый час.</p></div>
+        <div class="card"><h3>3. Режим завуча</h3><p>Решение по каждому уроку физкультуры «на улице / облегчённо / в зале» с причиной по EPA + объявление родителям kk/ru одной кнопкой.</p></div>
+      </div>
+      <p class="small" style="margin-top:22px">PWA без ключей и регистрации, работает офлайн с последними данными. Экран «Честность» — ошибки модели открыто.</p>
+    </div>
+    <div class="col" style="flex:.8;display:flex;justify-content:center">
+      <img class="phone" src="img/school_lessons_top.png" style="height:800px" alt="Режим завуча">
+    </div>
+  </div>
+  <div class="num">4</div>
+</section>
+
+<!-- 5. Demo -->
+<section class="slide">
+  <h2>Демо: 6 февраля 2025 за 4 шага</h2>
+  <div class="steps">
+    <div class="step"><div class="cap"><b>1. Сейчас</b>станция 125, CAMS 41 → «в зале»</div><img class="phone" src="img/hero_winter.png" style="width:390px"></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="cap"><b>2. Прогноз 48 ч</b>пик до 151; серые точки — факт</div><img class="phone" src="img/strip_winter.png" style="width:390px"></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="cap"><b>3. Почему</b>инверсия +6,7 °C, ветер 1,3 м/с</div><img class="phone" src="img/why_gauge.png" style="width:390px"></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="cap"><b>4. Школа</b>3-й урок — в зал, объявление kk/ru</div><img class="phone" src="img/school_announce_ru.png" style="width:390px"></div>
+  </div>
+  <p class="small" style="margin:10px 0 0">Зимний пример из архива (кнопка «Зимний пример» или <b>?demo=winter</b>): решение «в зал или нет» совпало с фактом в 13 из 13 уроков этого эпизода.</p>
+  <div class="num">5</div>
+</section>
+
+<!-- 6. How it works -->
+<section class="slide">
+  <h2>Как это работает и где ИИ</h2>
+  <div class="flow">
+    <div class="box"><b>Датчики сейчас</b>AirKaz.org + sensor.community через серверную функцию; неисправные отсеиваем</div>
+    <div class="farr">→</div>
+    <div class="box"><b>Погода и CAMS</b>Open-Meteo: T на 2 м и 850 гПа (инверсия), ветер, CAMS PM2.5</div>
+    <div class="farr">→</div>
+    <div class="box ai"><b>ИИ: прогноз 48 ч</b>48 ридж-регрессий (по одной на час вперёд), numpy, обучены на OpenAQ 8876</div>
+    <div class="farr">→</div>
+    <div class="box"><b>Правила, не генерация</b>Категории US EPA AQI, EPA Air Quality Flag, школа: max(прогноз, датчик)</div>
+  </div>
+  <div class="row">
+    <div class="col card">
+      <p style="margin:0 0 14px"><b>Где ИИ честно:</b> машинное обучение только в прогнозе. Советы и объявление — шаблоны с источниками EPA, без LLM.</p>
+      <p style="margin:0" class="muted">Признаки: текущее значение датчика, CAMS на час h, инверсия T850 − T2м, ветер, час суток. Слой перемешивания пробовали — точности не добавил, из модели убран.</p>
+    </div>
+    <div class="col card">
+      <p style="margin:0 0 14px"><b>Данные:</b> обучение окт 2024 – янв 2025 (2725 часов), тест строго позже — фев–мар и окт–ноя 2025 (2474 часа).</p>
+      <p style="margin:0" class="muted">Тесты: прогноз в Python и JS совпадает; разбор датчиков на битых данных; офлайн-цепочка.</p>
+    </div>
+  </div>
+  <div class="num">6</div>
+</section>
+
+<!-- 7. Evidence -->
+<section class="slide">
+  <h2>Доказательства: тест на реальной станции</h2>
+  <div class="row">
+    <div class="col">
+      <p class="muted" style="margin:0 0 10px;font-size:26px">Ошибка прогноза 1–48 ч, MAE, мкг/м³ (меньше — лучше)</p>
+      <table>
+        <tr><th></th><th>Все часы</th><th>Смог &gt; 100</th></tr>
+        <tr class="hl"><td>Наша модель</td><td>17,9</td><td>60,6</td></tr>
+        <tr><td>«Будет как сейчас»</td><td>23,7</td><td>55,2</td></tr>
+        <tr><td>CAMS как есть</td><td>22,7</td><td>92,3</td></tr>
+        <tr class="hl"><td>max(модель, датчик)</td><td>—</td><td>41,8</td></tr>
+      </table>
+      <p class="small" style="margin-top:18px">Честно: в сильный смог модель хуже правила «как сейчас» — поэтому школа решает по max(модель, датчик).</p>
+    </div>
+    <div class="col">
+      <p class="muted" style="margin:0 0 10px;font-size:26px">Решение «физкультура на улице?» (граница EPA 35,4)</p>
+      <table>
+        <tr><th>Правило</th><th>Точность</th><th>Поймано грязных часов</th></tr>
+        <tr><td>Наша модель</td><td>75%</td><td>72%</td></tr>
+        <tr><td>«Будет как сейчас»</td><td>70%</td><td>60%</td></tr>
+        <tr><td>CAMS</td><td>67%</td><td>40%</td></tr>
+        <tr class="hl"><td>max(модель, датчик) — в школе</td><td>70%</td><td>87%</td></tr>
+        <tr><td>«Всегда на улице»</td><td>63%</td><td>0%</td></tr>
+      </table>
+      <p class="small" style="margin-top:18px">Цена: уроков в зале 57% часов против 41%. Пропустить грязный урок хуже, чем лишний раз уйти в зал.</p>
+    </div>
+  </div>
+  <p class="small" style="margin:0">Станция OpenAQ 8876, тест фев–мар и окт–ноя 2025; соседние часы автокоррелированы. Воспроизводится: pipeline/train_forecast.py → evals/forecast_report.md.</p>
+  <div class="num">7</div>
+</section>
+
+<!-- 8. Comparison -->
+<section class="slide">
+  <h2>Чем лучше существующих</h2>
+  <table class="cmp">
+    <tr><th style="width:26%"></th><th style="width:30%">IQAir, AirKaz</th><th>Таза Тыныс</th></tr>
+    <tr><td><b>Что показывают</b></td><td>Число сейчас; прогноз IQAir — модельный</td><td>Реальный датчик у вашей точки + прогноз 48 ч, обученный на измерениях, с открытой ошибкой</td></tr>
+    <tr><td><b>Против CAMS</b></td><td>—</td><td>Датчик и CAMS рядом в одной точке</td></tr>
+    <tr class="hl"><td><b>Школа</b></td><td>Нет</td><td>Решение по каждому уроку физкультуры + объявление kk/ru</td></tr>
+    <tr><td><b>Почему</b></td><td>Нет</td><td>Инверсия, ветер, вклад признаков</td></tr>
+    <tr><td><b>Снижение выбросов</b></td><td>Нет</td><td>«Растопка сверху» с рецензируемым источником</td></tr>
+  </table>
+  <p class="muted" style="margin-top:30px">Сильная сторона AirKaz и IQAir — собственные сети датчиков. Мы ими пользуемся и добавляем решение для школы.</p>
+  <div class="num">8</div>
+</section>
+
+<!-- 9. Value and scale -->
+<section class="slide">
+  <h2>Польза и масштаб</h2>
+  <div class="row">
+    <div class="col">
+      <div class="card" style="margin-bottom:26px"><p style="margin:0"><b>Стоимость сейчас:</b> статический сайт + одна серверная функция, без ключей и аккаунтов. Код не привязан к Алматы, кроме карты районов.</p></div>
+      <div class="card" style="margin-bottom:26px"><p style="margin:0"><b>Узкое место — датчики.</b> Живых исправных 25.11.2026 (наш подсчёт): Алматы 2 AirKaz + 3 sensor.community; Астана 0 + 1; Караганда 0 + 3; Шымкент 0 + 0.</p></div>
+      <div class="card"><p style="margin:0"><b>Следующий шаг:</b> недорогой датчик во дворе школы — сразу точка на карте и старт прогноза.</p></div>
+    </div>
+    <div class="col">
+      <div class="card" style="margin-bottom:26px"><p style="margin:0"><b>Путь внедрения:</b> пилот в 2–3 школах одного района (завуч + учитель физкультуры) → месяц журнала решений → районный и городской отдел образования.</p></div>
+      <div class="card" style="margin-bottom:26px;border:2px dashed #c9a52a"><p style="margin:0"><b>Кто платит — гипотеза:</b> отделы образования (страница района, журнал решений) и школы (датчик во дворе). Не проверено.</p></div>
+      <div class="card"><p style="margin:0"><b>Рассылка:</b> объявление уже на двух языках; дальше — «Поделиться» в чат класса и утренняя рассылка по расписанию физкультуры.</p></div>
+    </div>
+  </div>
+  <div class="num">9</div>
+</section>
+
+<!-- 10. Tools, limits, next -->
+<section class="slide">
+  <h2>Чем сделано, ограничения, дальше</h2>
+  <div class="row">
+    <div class="col card">
+      <p style="margin:0 0 12px"><b>AI-инструменты</b></p>
+      <p style="margin:0 0 22px;font-size:26px">Claude Code и Claude (Anthropic) — помощь в коде, текстах, казахском переводе, упаковке презентации и видео; цифры проверены по источникам.</p>
+      <p style="margin:0 0 12px"><b>Библиотеки и данные</b></p>
+      <p style="margin:0;font-size:26px">HTML/CSS/JS без фреймворков; Python, numpy, Pillow; Vercel; Playwright, ffmpeg (видео). Данные: AirKaz, sensor.community, OpenAQ, Open-Meteo (CAMS), OpenStreetMap. Нормы: US EPA, ВОЗ 2021.</p>
+    </div>
+    <div class="col card">
+      <p style="margin:0 0 12px"><b>Ограничения честно</b></p>
+      <ul style="font-size:25px">
+        <li style="font-size:25px">Модель обучена на одной станции, стартует от дешёвых датчиков без поверки.</li>
+        <li style="font-size:25px">Живых датчиков единицы; ближайший может быть в нескольких км.</li>
+        <li style="font-size:25px">В сильный смог модель сглаживает пики.</li>
+        <li style="font-size:25px">Казахский переведён с ИИ — нужна вычитка носителем.</li>
+      </ul>
+    </div>
+    <div class="col card">
+      <p style="margin:0 0 12px"><b>Дальше</b></p>
+      <ul style="font-size:25px">
+        <li style="font-size:25px">Пилот в 2–3 школах, журнал решений.</li>
+        <li style="font-size:25px">Калибровка дешёвых датчиков по станции.</li>
+        <li style="font-size:25px">Датчики во дворах школ.</li>
+        <li style="font-size:25px">Рассылка в чаты классов.</li>
+      </ul>
+    </div>
+  </div>
+  <p style="margin:28px 0 0;font-size:32px"><b>taza-tynys.vercel.app</b> <span class="muted">· команда <span class="ph">{КОМАНДА}</span> · <span class="ph">{КОНТАКТ}</span></span></p>
+  <div class="num">10</div>
+</section>
+</body>
+</html>
