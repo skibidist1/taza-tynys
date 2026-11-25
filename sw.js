@@ -1,6 +1,6 @@
 // Service worker: versioned cache for the app shell and local data, network for Open-Meteo
 // (the app itself keeps the last forecast in localStorage).
-const VERSION = 'taza-v1';
+const VERSION = 'taza-v2';
 const ASSETS = [
   './',
   'index.html',
