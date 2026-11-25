@@ -59,12 +59,12 @@ export function relOf(h, stats) {
   return 'mid';
 }
 
-function runs(list, pred) {
+function runs(list, pred, crossDay = false) {
   const out = [];
   let cur = null;
   for (const h of list) {
     if (pred(h)) {
-      if (cur && h.idx === cur.end + 1 && dayOf(h) === cur.day) { cur.end = h.idx; cur.hours.push(h); } else { cur = { start: h.idx, end: h.idx, day: dayOf(h), hours: [h] }; out.push(cur); }
+      if (cur && h.idx === cur.end + 1 && (crossDay || dayOf(h) === cur.day)) { cur.end = h.idx; cur.hours.push(h); } else { cur = { start: h.idx, end: h.idx, day: dayOf(h), hours: [h] }; out.push(cur); }
     } else cur = null;
   }
   for (const r of out) {
@@ -97,9 +97,10 @@ export function findWindows(hours, nowIndex, profileKey) {
   });
 }
 
+// Next whole episode above the limit within the 48-hour forecast (may span midnight).
 export function nextBad(hours, nowIndex, limit = 35.4) {
-  const view = forecastView(hours, nowIndex, 24);
-  const bad = runs(view, (h) => h.fc > limit);
+  const view = forecastView(hours, nowIndex, 48);
+  const bad = runs(view, (h) => h.fc > limit, true);
   return bad.find((r) => r.hours.length >= 2) || bad[0] || null;
 }
 
@@ -116,7 +117,8 @@ export function actions(hours, nowIndex, profileKey) {
   if (now.fc <= 35.4 && (!vent || now.fc <= vent.fc * 1.15)) out.push({ key: 'vent_now', pm: now.fc });
   else if (vent && vent.idx !== now.idx) out.push({ key: 'vent_later', time: vent.time, pm: vent.fc });
   else out.push({ key: 'vent_short' });
-  const w = findWindows(hours, nowIndex, profileKey).find((x) => x.ok);
+  // the cleanest window by mean forecast over the next 48 hours
+  const w = findWindows(hours, nowIndex, profileKey).filter((x) => x.ok).sort((a, b) => a.window.mean - b.window.mean)[0];
   if (w) out.push({ key: 'activity_window', from: w.window.from, to: w.window.to, pm: w.window.max });
   else out.push({ key: 'activity_none', limit: prof.limit });
   out.push({ key: `cat_${CAT_KEYS[catOf(now.fc)]}_${profileKey}`, bad: nextBad(hours, nowIndex, prof.limit) });
@@ -125,10 +127,9 @@ export function actions(hours, nowIndex, profileKey) {
 
 // ---- School mode -------------------------------------------------------
 //
-// PE is prolonged/heavy exertion. EPA Flag Program chart: orange (USG) -> sensitive students
-// make activities shorter and less intense; red (Unhealthy) and above -> move activities indoors.
-// Because the log-space forecast smooths peaks, the "light" band starts at the model's
-// decision_threshold (tuned on training data, see evals/forecast_report.md).
+// PE is prolonged/heavy exertion. EPA Flag Program chart: orange (USG, > 35.4) -> sensitive students
+// make activities shorter and less intense; red (Unhealthy, > 55.4) and above -> move activities indoors.
+// The decision uses the worst forecast hour of the lesson. Lessons already over get 'r_past'.
 
 export const DEFAULT_BELLS = {
   1: [['08:00', '08:45'], ['08:55', '09:40'], ['09:50', '10:35'], ['10:55', '11:40'], ['11:50', '12:35'], ['12:45', '13:30'], ['13:40', '14:25']],
@@ -139,7 +140,8 @@ export const DEFAULT_PE = { 1: [3], 2: [2] };
 const toMin = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
 export const validTime = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 
-export function lessonVerdict(hours, day, from, to, lightFrom) {
+export function lessonVerdict(hours, day, from, to, lightFrom, nowTime = null) {
+  if (nowTime && `${day}T${to}` <= nowTime) return { verdict: null, reason: 'r_past' };
   const hs = hours.filter((h) => dayOf(h) === day && h.fc != null && (hourOf(h) + 1) * 60 > toMin(from) && hourOf(h) * 60 < toMin(to));
   if (!hs.length) return { verdict: null, reason: 'r_nodata' };
   const pm = Math.max(...hs.map((h) => h.fc));
@@ -151,10 +153,10 @@ export function lessonVerdict(hours, day, from, to, lightFrom) {
   return { ...base, verdict: 'yes', reason: 'r_ok' };
 }
 
-export function schoolDay(hours, day, bells, pe, lightFrom = 35.4) {
+export function schoolDay(hours, day, bells, pe, lightFrom = 35.4, nowTime = null) {
   return {
     day,
-    lessons: bells.map(([from, to], i) => ({ n: i + 1, from, to, pe: pe.includes(i + 1), ...lessonVerdict(hours, day, from, to, lightFrom) })),
+    lessons: bells.map(([from, to], i) => ({ n: i + 1, from, to, pe: pe.includes(i + 1), ...lessonVerdict(hours, day, from, to, lightFrom, nowTime) })),
   };
 }
 

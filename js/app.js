@@ -39,7 +39,10 @@ function dayName(day) {
   return `${weekday(day)}, ${dateLong(day)}`;
 }
 const pointLabel = () => (state.point.name || (state.point.key ? t(state.point.key) : t('place_custom')));
-const catName = (pm, l) => (l ? tl(l, `cat_${CAT_KEYS[catOf(pm)]}`) : t(`cat_${CAT_KEYS[catOf(pm)]}`));
+const shown = (pm) => (pm < 100 ? Math.round(pm * 10) / 10 : Math.round(pm)); // value as displayed
+const fmtPm = (pm) => num(shown(pm), pm < 100 ? 1 : 0);
+const catName = (pm, l) => (l ? tl(l, `cat_${CAT_KEYS[catOf(shown(pm))]}`) : t(`cat_${CAT_KEYS[catOf(shown(pm))]}`));
+const when = (time) => `${dayName(time.slice(0, 10)).toLowerCase()} ${hhmm(time)}`;
 
 function applyStatic() {
   document.documentElement.lang = getLang() === 'kk' ? 'kk' : 'ru';
@@ -56,8 +59,8 @@ function renderStatus() {
     html = `<b>${esc(t('src_archive', { t: stamp(data.fetchedAt) }))}</b> <button class="ghost" id="live" type="button">${esc(t('back_live'))}</button>
       <span class="note">${esc(t('archive_note'))}</span>`;
   } else {
-    const fk = { live: 'src_live', cache: 'src_cache', snapshot: 'src_snapshot' }[fcLoad.source];
-    const sk = { live: 'sn_live', cache: 'sn_cache', snapshot: 'sn_snapshot' }[snLoad.source];
+    const fk = fcLoad.source === 'live' || fcLoad.fresh ? 'src_live' : { cache: 'src_cache', snapshot: 'src_snapshot' }[fcLoad.source];
+    const sk = snLoad.source === 'live' || snLoad.fresh ? 'sn_live' : { cache: 'sn_cache', snapshot: 'sn_snapshot' }[snLoad.source];
     html = `<b>${esc(t(fk, { t: stamp(data.fetchedAt) }))}</b> · <span>${esc(t(sk, { attr: snLoad.sensors.attribution || '', t: stamp(snLoad.sensors.fetchedAt) }))}</span>`;
     if (fcLoad.source !== 'live' && fcLoad.error) html += ` <span class="warn">${esc(t('src_offline'))}</span>`;
     if (data.stale) html += ` <span class="warn">${esc(t('src_stale'))}</span>`;
@@ -104,16 +107,27 @@ function renderPlace() {
   });
 }
 
-function setPoint(p) {
+async function setPoint(p) {
   state.point = p;
-  if (state.mode === 'live') store.set('point', p);
   compute();
   renderAll();
+  if (state.mode !== 'live') return;
+  store.set('point', p);
+  // CAMS and weather at the new school point
+  const fc = await loadForecast({ point: p }).catch(() => null);
+  if (fc && state.point === p) { state.fcLoad = fc; compute(); renderAll(); }
 }
 
 // ---------- today ----------
 function renderHero() {
   const { hours, nowIndex } = state.data;
+  const sn = state.snLoad.sensors;
+  if (state.pmNow == null) {
+    $('#hero').style.setProperty('--hero', 'var(--line)');
+    $('#hero').innerHTML = `<p class="kicker">${esc(t('now_title'))} · ${esc(pointLabel())}</p>
+      <div class="big"><span class="value small-v">${esc(t('no_data'))}</span></div><div class="facts"><span>${esc(t('no_data_hint'))}</span></div>`;
+    return;
+  }
   const cams = hours[nowIndex].cams;
   const pm = state.pmNow;
   const near = state.near;
@@ -121,17 +135,41 @@ function renderHero() {
   let cmp = t('cams_close');
   if (ratio && ratio > 1.3) cmp = t('cams_low', { x: num(ratio, 1) });
   else if (ratio && ratio < 1 / 1.3) cmp = t('cams_high', { x: num(1 / ratio, 1) });
-  const sn = state.snLoad.sensors;
-  $('#hero').style.setProperty('--hero', catVar(pm));
+  // same rule as the school mode (EPA flag chart), applied to the measured value
+  const v = shown(pm);
+  const pe = { verdict: v > 55.4 ? 'no' : v > 35.4 ? 'light' : 'yes' };
+  $('#hero').style.setProperty('--hero', catVar(shown(pm)));
   $('#hero').innerHTML = `
     <p class="kicker">${esc(t('now_title'))} · ${esc(pointLabel())}</p>
-    <div class="big"><span class="value">${num(pm)}</span><span class="unit">${esc(t('pm_unit'))}</span><span class="pill">${esc(catName(pm))}</span></div>
+    <div class="big"><span class="value">${fmtPm(pm)}</span><span class="unit">${esc(t('pm_unit'))}</span><span class="pill">${esc(catName(pm))}</span></div>
+    ${pe.verdict ? `<p class="hero-pe v-${pe.verdict}">${esc(t('hero_pe', { v: t(`v_${pe.verdict}`) }))}</p>` : ''}
     <div class="facts">
-      ${near ? `<span>${esc(t('now_sensor', { name: near.sensor.name, km: num(near.km, 1) }))}</span>` : `<span class="warn">${esc(t('no_sensor'))}</span>`}
-      ${near && near.km > 5 ? `<span class="warn">${esc(t('sensor_far', { km: num(near.km, 1) }))}</span>` : ''}
+      <span>${esc(t('now_sensor', { name: near.sensor.name, km: num(near.km, 1) }))}</span>
+      ${near.km > 5 ? `<span class="warn">${esc(t('sensor_far', { km: num(near.km, 1) }))}</span>` : ''}
       <span>${esc(t('now_city', { m: num(sn.median, 1), n: sn.liveCount ?? 0 }))}</span>
     </div>
-    <div class="vs"><span>${esc(t('cams_says', { v: num(cams) }))}</span>${near ? `<b>${esc(cmp)}</b>` : ''}</div>`;
+    <div class="vs"><span>${esc(t('cams_says', { v: num(cams) }))}</span><b>${esc(cmp)}</b></div>
+    ${state.mode === 'archive' ? demoEval() : ''}`;
+}
+
+// 10: how the forecast did on the archived episode, next to persistence, and whether PE decisions held.
+function demoEval() {
+  const { hours, nowIndex } = state.data;
+  const act = state.actual;
+  const view = forecastView(hours, nowIndex).filter((h) => h.h > 0 && act[h.time] != null);
+  if (!view.length) return '';
+  const mae = (f) => view.reduce((a, h) => a + Math.abs(f(h) - act[h.time]), 0) / view.length;
+  const day = hours[nowIndex].time.slice(0, 10);
+  const days = schoolDays(hours, nowIndex, DEFAULT_BELLS[1]);
+  let ok = 0;
+  let n = 0;
+  for (const d of days) {
+    const actualHours = hours.map((h) => ({ ...h, fc: act[h.time] ?? null }));
+    const f = schoolDay(hours, d, DEFAULT_BELLS[1], [], 35.4, d === day ? hours[nowIndex].time.slice(0, 16) : null).lessons;
+    const a = schoolDay(actualHours, d, DEFAULT_BELLS[1], [], 35.4, d === day ? hours[nowIndex].time.slice(0, 16) : null).lessons;
+    f.forEach((l, i) => { if (l.verdict && a[i].verdict) { n++; if ((l.verdict === 'no') === (a[i].verdict === 'no')) ok++; } });
+  }
+  return `<p class="demo-eval">${esc(t('demo_eval', { m: num(mae((h) => h.fc)), p: num(mae(() => state.pmNow)), ok, n }))}</p>`;
 }
 
 function renderProfiles() {
@@ -146,13 +184,14 @@ function renderProfiles() {
 
 function renderActions() {
   const { hours, nowIndex } = state.data;
+  if (state.pmNow == null) { $('#actions').innerHTML = `<p class="small">${esc(t('no_data_hint'))}</p>`; return; }
   const items = actions(hours, nowIndex, state.profile).map((a) => {
     if (a.key === 'vent_now') return esc(t('vent_now', { pm: num(a.pm) }));
     if (a.key === 'vent_later') return esc(t('vent_later', { t: hhmm(a.time), pm: num(a.pm) }));
     if (a.key === 'vent_short') return esc(t('vent_short'));
     if (a.key === 'activity_window') return esc(t('activity_window', { from: `${dayName(a.from.slice(0, 10)).toLowerCase()} ${hhmm(a.from)}`, to: hhPlus1(a.to), pm: num(a.pm) }));
     if (a.key === 'activity_none') return esc(t('activity_none', { limit: num(a.limit, 1) }));
-    const bad = a.bad ? `<span class="sub2">${esc(t('bad_span', { from: hhmm(a.bad.from), to: hhPlus1(a.bad.to), max: num(a.bad.max) }))}</span>` : '';
+    const bad = a.bad ? `<span class="sub2">${esc(t('bad_span', { from: when(a.bad.from), to: `${dayName(a.bad.to.slice(0, 10)).toLowerCase()} ${hhPlus1(a.bad.to)}`, max: num(a.bad.max) }))}</span>` : '';
     return `${esc(t(a.key))}${bad}`;
   });
   $('#actions').innerHTML = `<h2>${esc(t('actions_title'))}</h2>
@@ -162,6 +201,7 @@ function renderActions() {
 
 function renderStrip() {
   const { hours, nowIndex } = state.data;
+  if (state.pmNow == null) { $('#strip').innerHTML = ''; $('#hour-detail').textContent = t('no_data_hint'); return; }
   const view = forecastView(hours, nowIndex);
   const inWin = new Set();
   findWindows(hours, nowIndex, state.profile).filter((w) => w.ok).forEach((w) => w.window.hours.forEach((h) => inWin.add(h.idx)));
@@ -194,6 +234,7 @@ function renderStrip() {
 
 function renderWindows() {
   const { hours, nowIndex } = state.data;
+  if (state.pmNow == null) { $('#windows').innerHTML = ''; return; }
   const prof = PROFILES[state.profile];
   const wins = findWindows(hours, nowIndex, state.profile);
   const rng = (a, b) => (num(a) === num(b) ? num(a) : `${num(a)}–${num(b)}`);
@@ -224,12 +265,14 @@ function renderToday() {
 function renderWhy() {
   const el = $('#view-why');
   const { hours, nowIndex } = state.data;
+  if (state.pmNow == null) { el.innerHTML = `<article class="card"><p>${esc(t('no_data_hint'))}</p></article>`; return; }
   const h = hours[state.sel ?? nowIndex];
   const view = forecastView(hours, nowIndex).filter((x) => x.h > 0);
   const worst = view.reduce((a, b) => (b.fc > a.fc ? b : a), view[0]);
   const picks = [{ k: 'pick_now', i: nowIndex }, ...(worst ? [{ k: 'pick_worst', i: worst.idx, tm: `${dayName(worst.time.slice(0, 10)).toLowerCase()} ${hhmm(worst.time)}` }] : [])];
   const phys = [
-    h.inv != null ? t(h.inv > 0 ? 'inv_yes' : 'inv_no', { v: num(Math.abs(h.inv), 1) }) : '',
+    // 850 hPa is ~700 m above Almaty; a standard atmosphere cools ~4.5 degC over that height
+    h.inv != null ? t(h.inv > 0 ? 'inv_yes' : h.inv > -4 ? 'inv_stable' : 'inv_no', { v: num(Math.abs(h.inv), 1) }) : '',
     t('wind_txt', { v: num(h.wind, 1) }),
     t('blh_txt', { v: num(h.blh) }),
   ].filter(Boolean);
@@ -254,9 +297,9 @@ function renderWhy() {
     </article>
     <article class="card">
       <div class="wx">
-        <div><b>${h.inv == null ? '—' : `${h.inv > 0 ? '+' : ''}${num(h.inv, 1)}°`}</b><span>T850 − T2м</span></div>
-        <div><b>${num(h.wind, 1)}</b><span>м/с</span></div>
-        <div><b>${num(h.blh)}</b><span>м · BLH</span></div>
+        <div><b>${h.inv == null ? '—' : `${h.inv > 0 ? '+' : ''}${num(h.inv, 1)}°`}</b><span>${esc(t('lbl_inv'))}</span></div>
+        <div><b>${num(h.wind, 1)}</b><span>${esc(t('u_ms'))}</span></div>
+        <div><b>${num(h.blh)}</b><span>${esc(t('lbl_blh'))}</span></div>
       </div>
       <h2 style="margin-top:14px">${esc(t('contrib_title'))}</h2>
       ${contribHtml}
@@ -328,14 +371,20 @@ function renderSchool() {
   const pe = cfg.pe[cfg.shift];
   const save = () => { store.set('school2', cfg); renderSchool(); };
   const thr = 35.4;
-  const days = schoolDays(state.data.hours, state.data.nowIndex, bells);
-  if (!days.includes(state.schoolDay)) state.schoolDay = days[0] || null;
-  const sd = state.schoolDay ? schoolDay(state.data.hours, state.schoolDay, bells, pe, thr) : null;
+  const nowTime = state.data.hours[state.data.nowIndex].time.slice(0, 16);
+  const days = state.pmNow == null ? [] : schoolDays(state.data.hours, state.data.nowIndex, bells);
+  if (!days.includes(state.schoolDay)) {
+    // default: today, unless all of today's PE lessons are already over
+    const today = schoolDay(state.data.hours, days[0] || '', bells, pe, thr, nowTime);
+    const todayDone = pe.length && today.lessons.filter((l) => l.pe).every((l) => l.reason === 'r_past');
+    state.schoolDay = (todayDone && days[1]) || days[0] || null;
+  }
+  const sd = state.schoolDay ? schoolDay(state.data.hours, state.schoolDay, bells, pe, thr, nowTime) : null;
   const chip = (attr, val, cur, label) => `<button class="chip" role="radio" ${attr}="${val}" aria-checked="${val === cur}">${esc(label)}</button>`;
   const row = (l) => {
     const res = l.pe && l.verdict
       ? `<span class="v">${esc(t(`v_${l.verdict}`))}</span><span class="why2">${esc(t(l.reason, { pm: num(l.pm), cat: catName(l.pm) }))}</span>`
-      : `<span class="pm">${l.verdict ? `PM2.5 ${num(l.pm)} · ${num(l.temp)}°` : esc(t('r_nodata'))}</span>`;
+      : `<span class="pm">${l.verdict ? `PM2.5 ${num(l.pm)} · ${num(l.temp)}°` : esc(t(l.reason))}</span>`;
     return `<li class="${l.pe && l.verdict ? `v-${l.verdict}` : 'plain'}">
       <span class="ln">${esc(t('lesson', { n: l.n }))}<span class="tm">${l.from}–${l.to}</span></span>
       <label class="pe"><input type="checkbox" data-pe="${l.n}" ${l.pe ? 'checked' : ''}> ${esc(t('pe_label'))}</label>
@@ -423,7 +472,10 @@ function renderHonest() {
       <tbody>${Object.entries(m.buckets).map(([b, v]) => `<tr><td>${esc(b)}</td><td><b>${f1(v.model)}</b></td><td>${f1(v.persistence)}</td><td>${f1(v.cams)}</td></tr>`).join('')}
       <tr><td><b>1–48</b></td><td><b>${f1(m.mae_model)}</b></td><td>${f1(m.mae_persistence)}</td><td>${f1(m.mae_cams)}</td></tr></tbody></table>
       <p class="small" style="margin-top:10px"><b>${esc(t('h_peaks', { m: f1(m.mae_peaks_over_100.model), p: f1(m.mae_peaks_over_100.persistence), c: f1(m.mae_peaks_over_100.cams) }))}</b></p>
-      <p class="small" style="margin-top:10px">${esc(t('h_dec', { m: num(m.decision_acc.model * 100), p: num(m.decision_acc.persistence * 100), c: num(m.decision_acc.cams * 100) }))}</p></article>
+      <p class="small" style="margin-top:10px">${esc(t('h_dec', {
+        m: num(m.decision_acc.model * 100), p: num(m.decision_acc.persistence * 100), c: num(m.decision_acc.cams * 100), a: num(m.decision_acc.always_outdoor * 100),
+        rm: num(m.decision_recall_bad.model * 100), rp: num(m.decision_recall_bad.persistence * 100), rc: num(m.decision_recall_bad.cams * 100),
+      }))}</p></article>
     <article class="card"><h2>${esc(t('h_small_title'))}</h2><p class="hint">${esc(t('h_small_hint'))}</p>
       ${small.length ? `<table class="tbl"><thead><tr><th>${esc(t('h_col_sensor'))}</th><th>${esc(t('h_col_model'))}</th><th>${esc(t('h_col_pers'))}</th><th>${esc(t('h_col_cams'))}</th></tr></thead>
       <tbody>${small.map((r) => `<tr><td>${esc(r.sensor)}</td><td><b>${f1(r.mae.model)}</b></td><td>${f1(r.mae.persistence)}</td><td>${f1(r.mae.cams)}</td></tr>`).join('')}</tbody></table>` : '<p>—</p>'}</article>
@@ -446,8 +498,7 @@ function compute() {
   const sensors = state.snLoad.sensors.sensors;
   state.near = nearestSensor(sensors, state.point);
   const nowMs = state.mode === 'archive' ? Date.parse(raw.fetchedAt) : Date.now();
-  const probe = buildHours(raw, state.model, null, nowMs);
-  state.pmNow = state.near ? state.near.sensor.pm25 : probe.hours[probe.nowIndex].cams;
+  state.pmNow = state.near ? state.near.sensor.pm25 : null; // no real sensor -> no advice (we never present CAMS as "now")
   state.data = buildHours(raw, state.model, state.pmNow, nowMs);
   if (state.sel === null || state.sel < state.data.nowIndex) state.sel = state.data.nowIndex;
 }
@@ -476,9 +527,9 @@ async function boot(mode = 'live', preferCache = true) {
     state.point = { key: null, name: 'OpenAQ 8876', lat: 43.2529, lon: 76.9312 };
   } else {
     // First paint from cached/bundled sensors, then refresh them without blocking the screen.
-    [state.fcLoad, state.snLoad] = await Promise.all([loadForecast({ preferCache }), initialSensors()]);
-    state.actual = null;
     state.point = store.get('point', { key: 'd_almaly', lat: 43.250, lon: 76.905 });
+    [state.fcLoad, state.snLoad] = await Promise.all([loadForecast({ preferCache, point: state.point }), initialSensors()]);
+    state.actual = null;
   }
   state.sel = null;
   state.schoolDay = null;
@@ -502,7 +553,7 @@ $('#lang').onclick = () => { setLang(getLang() === 'kk' ? 'ru' : 'kk'); renderAl
 applyStatic();
 if (TABS.includes(location.hash.slice(1))) showTab(location.hash.slice(1));
 boot(new URLSearchParams(location.search).get('demo') === 'winter' ? 'archive' : 'live').catch((e) => {
-  $('#hero').innerHTML = `<p class="loading">Ошибка загрузки: ${esc(e.message || e)}</p>`;
+  $('#hero').innerHTML = `<p class="loading">${esc(t('load_error'))}: ${esc(e.message || e)}</p>`;
 });
 
 if ('serviceWorker' in navigator) {

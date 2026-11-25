@@ -784,7 +784,18 @@
   "decision_acc": {
    "model": 0.749,
    "persistence": 0.702,
-   "cams": 0.672
+   "cams": 0.672,
+   "always_outdoor": 0.627
+  },
+  "decision_recall_bad": {
+   "model": 0.717,
+   "persistence": 0.602,
+   "cams": 0.396
+  },
+  "decision_precision_bad": {
+   "model": 0.648,
+   "persistence": 0.6,
+   "cams": 0.59
   },
   "mae_peaks_over_100": {
    "model": 60.6,

@@ -142,7 +142,9 @@ def main():
         "mae_persistence": round(overall["mae"]["persistence"], 2),
         "mae_cams": round(overall["mae"]["cams"], 2),
         "buckets": {b: {k: round(v, 2) for k, v in d["mae"].items()} for b, d in buckets.items()},
-        "decision_acc": {k: round(v[0], 3) for k, v in overall["decision"].items()},
+        "decision_acc": {**{k: round(v[0], 3) for k, v in overall["decision"].items()}, "always_outdoor": round(1 - overall["bad_share"], 3)},
+        "decision_recall_bad": {k: round(v[2], 3) for k, v in overall["decision"].items()},
+        "decision_precision_bad": {k: round(v[1], 3) for k, v in overall["decision"].items()},
         "mae_peaks_over_100": {k: round(v, 1) for k, v in overall["mae_peaks"].items()},
         "median_ratio_ground_to_cams": round(ratio, 2),
         "peaks_over_100": {k: round(v, 1) for k, v in peak.items()},
@@ -214,6 +216,8 @@ def write_report(model, buckets, overall, h, per_h, ratio, peak):
     for k, nm in names.items():
         a, p, r = overall["decision"][k]
         L.append(f"| {nm} | {f(100 * a, 0)}% | {f(100 * p, 0)}% | {f(100 * r, 0)}% | {f(100 * overall['cat_acc'][k], 0)}% |")
+    L.append(f"| Правило «всегда на улице» | {f(100 * (1 - overall['bad_share']), 0)}% | — | 0% | — |")
+    L += ["", "Точность решения обманчива: правило «всегда на улице» уже даёт столько, сколько чистых часов. Главное — recall «плохо»: какую долю грязных часов прогноз поймал и отправил детей в зал."]
     L += [
         "",
         "## MAE по каждому горизонту",

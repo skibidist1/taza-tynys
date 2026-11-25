@@ -2,9 +2,14 @@
 // CAMS + weather forecast (Open-Meteo -> cache -> data/snapshot.json), and the 48-hour forecast.
 import { features, predict, HORIZON } from './forecast.js';
 
-const COMMON = 'latitude=43.24&longitude=76.89&timezone=Asia%2FAlmaty&past_days=1&forecast_days=3';
-export const AIR_URL = `https://air-quality-api.open-meteo.com/v1/air-quality?${COMMON}&hourly=pm2_5,pm10,us_aqi`;
-export const WX_URL = `https://api.open-meteo.com/v1/forecast?${COMMON}&hourly=temperature_2m,temperature_850hPa,wind_speed_10m,boundary_layer_height&wind_speed_unit=ms`;
+// CAMS and weather are requested at the selected school point (rounded to ~1 km for caching).
+export function forecastUrls(point = { lat: 43.24, lon: 76.89 }) {
+  const common = `latitude=${point.lat.toFixed(2)}&longitude=${point.lon.toFixed(2)}&timezone=Asia%2FAlmaty&past_days=1&forecast_days=3`;
+  return {
+    air: `https://air-quality-api.open-meteo.com/v1/air-quality?${common}&hourly=pm2_5,pm10,us_aqi`,
+    wx: `https://api.open-meteo.com/v1/forecast?${common}&hourly=temperature_2m,temperature_850hPa,wind_speed_10m,boundary_layer_height&wind_speed_unit=ms`,
+  };
+}
 export const SENSORS_URL = 'api/sensors';
 const FC_KEY = 'taza.forecast.v2';
 const SN_KEY = 'taza.sensors.v1';
@@ -70,12 +75,14 @@ async function chain(url, key, freshMs, valid, wrap, fallbackUrl, preferCache) {
   return { data: snap, source: 'snapshot', error };
 }
 
-export async function loadForecast({ preferCache = true } = {}) {
-  const r = await chain(null, FC_KEY, FC_FRESH_MS, validRaw, async () => {
-    const [air, weather] = await Promise.all([fetchJson(AIR_URL), fetchJson(WX_URL)]);
+export async function loadForecast({ preferCache = true, point } = {}) {
+  const urls = forecastUrls(point);
+  const key = point ? `${FC_KEY}.${point.lat.toFixed(2)},${point.lon.toFixed(2)}` : FC_KEY;
+  const r = await chain(null, key, FC_FRESH_MS, validRaw, async () => {
+    const [air, weather] = await Promise.all([fetchJson(urls.air), fetchJson(urls.wx)]);
     return { air, weather, fetchedAt: localStamp(Date.now(), air.utc_offset_seconds ?? 18000) };
   }, 'data/snapshot.json', preferCache);
-  return { raw: r.data, source: r.source, error: r.error };
+  return { raw: r.data, source: r.source, error: r.error, fresh: r.fresh };
 }
 
 export const SENSORS_TIMEOUT_MS = 18000; // a cold serverless start can take ~9 s
@@ -89,7 +96,7 @@ export async function initialSensors() {
 
 export async function loadSensors({ preferCache = true } = {}) {
   const r = await chain(SENSORS_URL, SN_KEY, SN_FRESH_MS, validSensors, (u) => fetchJson(u, SENSORS_TIMEOUT_MS), 'data/sensors_snapshot.json', preferCache);
-  return { sensors: r.data, source: r.data.snapshot && r.source === 'live' ? 'snapshot' : r.source, error: r.error };
+  return { sensors: r.data, source: r.data.snapshot && r.source === 'live' ? 'snapshot' : r.source, error: r.error, fresh: r.fresh };
 }
 
 // ---- geography -----------------------------------------------------------
@@ -136,7 +143,8 @@ export function buildHours(raw, model, pmNow, nowMs = Date.now()) {
   const nowKey = localStamp(nowMs, offset).slice(0, 13);
   let nowIndex = hours.findIndex((h) => h.time.slice(0, 13) === nowKey);
   let stale = false;
-  if (nowIndex < 0 || hours.length - nowIndex < 24) {
+  if (nowIndex < 0) {
+    // the data does not contain the real current hour (old cache/snapshot): replay from the fetch time, marked stale
     stale = true;
     nowIndex = Math.max(0, hours.findIndex((h) => h.time.slice(0, 13) === raw.fetchedAt.slice(0, 13)));
   }
