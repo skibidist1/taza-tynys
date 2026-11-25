@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Таза Тыныс — воздух Алматы по часам</title>
+  <meta name="description" content="Прогноз смога в Алматы превращается в личный план по часам: когда проветривать, гулять с ребёнком, бегать и проводить физкультуру на улице.">
+  <meta name="theme-color" content="#eef4f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1a18" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 48 48" aria-hidden="true"><use href="#logo"></use></svg>
+      <div>
+        <h1>Таза Тыныс</h1>
+        <p class="sub" data-i18n="app_sub"></p>
+      </div>
+    </div>
+    <button id="lang" class="ghost" type="button"></button>
+  </header>
+
+  <div id="status" class="status" role="status" aria-live="polite"></div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="today" data-i18n="tab_today" aria-selected="true"></button>
+    <button role="tab" data-tab="why" data-i18n="tab_why"></button>
+    <button role="tab" data-tab="school" data-i18n="tab_school"></button>
+    <button role="tab" data-tab="home" data-i18n="tab_home"></button>
+  </nav>
+
+  <main>
+    <section id="view-today" class="view" data-view="today">
+      <div class="hero" id="hero"><p class="loading" data-i18n="loading"></p></div>
+      <div class="profiles" id="profiles" role="radiogroup"></div>
+      <article class="card" id="actions"></article>
+      <article class="card scale-card">
+        <div class="card-head"><h2 data-i18n="scale_title"></h2><p class="hint" data-i18n="scale_hint"></p></div>
+        <div class="strip-wrap" id="strip-wrap"><div class="strip" id="strip"></div></div>
+        <div class="marks"><span class="mk mk-win"></span><span data-i18n="mark_window"></span><span class="mk mk-trap"></span><span data-i18n="mark_trap"></span></div>
+        <p class="hour-detail" id="hour-detail"></p>
+      </article>
+      <article class="card" id="windows"></article>
+      <article class="card legend" id="legend"></article>
+    </section>
+
+    <section id="view-why" class="view" data-view="why" hidden></section>
+    <section id="view-school" class="view" data-view="school" hidden></section>
+    <section id="view-home" class="view" data-view="home" hidden></section>
+  </main>
+
+  <footer class="foot">
+    <p data-i18n="install_offline"></p>
+    <p>Данные: Open-Meteo (CC BY 4.0), CAMS / Copernicus. Таза Тыныс — Órleu Hack 2026.</p>
+  </footer>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="logo" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="22" fill="var(--lvl0)"/>
+      <path d="M9 21c5-5 10-5 15 0s10 5 15 0" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M9 30c5-5 10-5 15 0s10 5 15 0" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linecap="round" opacity=".45"/>
+    </symbol>
+  </svg>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

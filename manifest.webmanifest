@@ -1,0 +1,16 @@
+{
+  "name": "Таза Тыныс — воздух Алматы по часам",
+  "short_name": "Таза Тыныс",
+  "description": "Прогноз смога Алматы как личный план по часам",
+  "lang": "ru",
+  "start_url": "./index.html#today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef4f2",
+  "theme_color": "#eef4f2",
+  "icons": [
+    {"src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml"},
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
