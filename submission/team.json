@@ -1,0 +1,9 @@
+{
+ "_help": "Данные команды для слайдов, видео, DEFENSE.md и DESCRIPTION.md. Пустое поле = блок не показывается. После правки: python3 tools/build_all.py (или --docs для одних текстов).",
+ "team": "",
+ "members": [],
+ "code_url": "",
+ "contact": "",
+ "quote": {"text": "", "author": ""},
+ "interviews": ""
+}

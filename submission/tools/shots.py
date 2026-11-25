@@ -1,6 +1,8 @@
+import pathlib
 import sys
 from playwright.sync_api import sync_playwright
-out=sys.argv[1]
+# screenshots of production for the slides; default output: submission/img
+out=sys.argv[1] if len(sys.argv)>1 else str(pathlib.Path(__file__).resolve().parent.parent/'img')
 U='https://taza-tynys.vercel.app/'
 with sync_playwright() as p:
     b=p.chromium.launch()
