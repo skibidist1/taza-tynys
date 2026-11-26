@@ -15,5 +15,5 @@
 Работает: PWA без ключей и регистрации, офлайн с последними данными, зимний пример из архива (6 февраля 2025: станция 125, CAMS 41). Сделано с Claude Code.
 
 Прототип: https://taza-tynys.vercel.app (зимний пример: ?demo=winter)
-Код: https://github.com/Ibrakazah/taza-tynys
+Код: https://github.com/skibidist1/taza-tynys
 
