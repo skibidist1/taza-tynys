@@ -2,6 +2,8 @@
 
 Финал: до 5 минут выступление и демо, затем 3–5 минут вопросов. Прототип: https://taza-tynys.vercel.app · зимний пример: `https://taza-tynys.vercel.app/?demo=winter` (или кнопка «Зимний пример»).
 
+ · код: https://github.com/Ibrakazah/taza-tynys
+
 Этот файл собирается из `tools/templates/DEFENSE.md` и `team.json` командой `python3 tools/build_all.py --docs`. Правьте шаблон и `team.json`, а не этот файл.
 
 ## 1. Выступление на 5 минут
